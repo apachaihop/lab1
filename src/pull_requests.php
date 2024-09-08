@@ -1,6 +1,6 @@
 <?php
 include 'connection.php';
-include '../header.php';
+include '../includes/header.php';
 $conn = getConnection();
 
 $sql = "SELECT title, description, status FROM PullRequests";
@@ -30,5 +30,5 @@ if ($result->num_rows > 0) {
 }
 
 closeConnection($conn);
-include '../footer.php';
+include '../includes/footer.php';
 ?>

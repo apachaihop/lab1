@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VCS Project</title>
-    <link href="./styles/styles.css" rel="stylesheet">
+    <link rel="stylesheet" href="/lab1/styles/styles.css">
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -17,10 +17,11 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <li class="nav-item"><a class="nav-link" href="./src/repositories.php">Repositories</a></li>
-                    <li class="nav-item"><a class="nav-link" href="./src/issues.php">Issues</a></li>
-                    <li class="nav-item"><a class="nav-link" href="./src/pull_requests.php">Pull Requests</a></li>
-                    <li class="nav-item"><a class="nav-link" href="./src/users.php">Users</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/lab1/index.php">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/lab1/src/repositories.php">Repositories</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/lab1/src/issues.php">Issues</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/lab1/src/pull_requests.php">Pull Requests</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/lab1/src/users.php">Users</a></li>
                 </ul>
             </div>
         </nav>

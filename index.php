@@ -1,5 +1,5 @@
 <?php
-include 'header.php';
+include './includes/header.php';
 include './src/connection.php';
 
 $conn = getConnection();
@@ -68,5 +68,5 @@ closeConnection($conn);
 </form>
 
 <?php
-include 'footer.php';
+include './includes/footer.php';
 ?>
