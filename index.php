@@ -59,9 +59,18 @@ closeConnection($conn);
 </div>
 
 <h2>Submit a Review</h2>
+
+
 <form action="./src/submit_review.php" method="post">
     <div class="form-group">
-        <label for="review">Review</label>
+        <div class="row">
+            <div class="col-md-6">
+                <label for="review">Review</label>
+            </div>
+            <div class="col-md-6 text-right">
+                <a href="./src/reviews.php">View Reviews</a>
+            </div>
+        </div>
         <textarea class="form-control" id="review" name="review" rows="3" required></textarea>
     </div>
     <button type="submit" class="btn btn-primary">Submit</button>
