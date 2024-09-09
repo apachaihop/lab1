@@ -5,8 +5,8 @@ include '../includes/header.php';
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
-    $name = $_POST['name'];
-    $description = $_POST['description'];
+    $name = htmlspecialchars($_POST['name']);
+    $description = htmlspecialchars($_POST['description']);
 
     $stmt = $conn->prepare("INSERT INTO Repositories (name, description) VALUES (?, ?)");
     $stmt->bind_param("ss", $name, $description);
@@ -14,10 +14,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
     $stmt->close();
 }
 
-$searchField = isset($_GET['field']) ? $_GET['field'] : '';
-$searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
+$searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
+$searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
 
-$sql = "SELECT name, description FROM Repositories";
+$sql = "SELECT repo_id, name, description FROM Repositories";
 if ($searchField && $searchTerm) {
     $sql .= " WHERE $searchField LIKE ?";
 }
@@ -69,13 +69,49 @@ if ($result->num_rows > 0) {
                 <tr>
                     <th>Name</th>
                     <th>Description</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>";
     while($row = $result->fetch_assoc()) {
         echo "<tr>
-                <td>" . $row["name"]. "</td>
-                <td>" . $row["description"]. "</td>
+                <td>" . htmlspecialchars($row["name"]) . "</td>
+                <td>" . htmlspecialchars($row["description"]) . "</td>
+                <td>
+                    <form method='post' action='delete_repository.php' style='display:inline;'>
+                        <input type='hidden' name='repo_id' value='" . htmlspecialchars($row["repo_id"]) . "'>
+                        <button type='submit' class='btn btn-danger'>Delete</button>
+                    </form>
+                    <button type='button' class='btn btn-warning' data-toggle='modal' data-target='#updateModal" . htmlspecialchars($row["repo_id"]) . "'>Update</button>
+                    
+                    <!-- Update Modal -->
+                    <div class='modal fade' id='updateModal" . htmlspecialchars($row["repo_id"]) . "' tabindex='-1' role='dialog' aria-labelledby='updateModalLabel" . htmlspecialchars($row["repo_id"]) . "' aria-hidden='true'>
+                        <div class='modal-dialog' role='document'>
+                            <div class='modal-content'>
+                                <div class='modal-header'>
+                                    <h5 class='modal-title' id='updateModalLabel" . htmlspecialchars($row["repo_id"]) . "'>Update Repository</h5>
+                                    <button type='button' class='close' data-dismiss='modal' aria-label='Close'>
+                                        <span aria-hidden='true'>&times;</span>
+                                    </button>
+                                </div>
+                                <div class='modal-body'>
+                                    <form method='post' action='update_repository.php'>
+                                        <input type='hidden' name='repo_id' value='" . htmlspecialchars($row["repo_id"]) . "'>
+                                        <div class='form-group'>
+                                            <label for='name'>Name:</label>
+                                            <input type='text' class='form-control' id='name' name='name' value='" . htmlspecialchars($row["name"]) . "' required>
+                                        </div>
+                                        <div class='form-group'>
+                                            <label for='description'>Description:</label>
+                                            <input type='text' class='form-control' id='description' name='description' value='" . htmlspecialchars($row["description"]) . "' required>
+                                        </div>
+                                        <button type='submit' class='btn btn-primary'>Update</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
               </tr>";
     }
     echo "</tbody></table>";
