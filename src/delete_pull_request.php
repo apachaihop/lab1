@@ -4,14 +4,14 @@ include 'connection.php';
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $issue_id = htmlspecialchars($_POST['issue_id']);
+    $id = htmlspecialchars($_POST['id']);
 
-    $stmt = $conn->prepare("DELETE FROM Issues WHERE issue_id = ?");
+    $stmt = $conn->prepare("DELETE FROM PullRequests WHERE pr_id = ?");
     if ($stmt === false) {
         die('Prepare failed: ' . htmlspecialchars($conn->error));
     }
 
-    $stmt->bind_param("i", $issue_id);
+    $stmt->bind_param("i", $id);
     if ($stmt->execute() === false) {
         die('Execute failed: ' . htmlspecialchars($stmt->error));
     }
@@ -21,6 +21,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 closeConnection($conn);
 
-header("Location: issues.php");
+header("Location: pull_requests.php");
 exit();
 ?>
