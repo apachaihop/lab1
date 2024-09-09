@@ -4,7 +4,7 @@ include '../includes/header.php';
 
 $conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['title'])) {
     $title = $_POST['title'];
     $description = $_POST['description'];
     $status = $_POST['status'];
@@ -15,8 +15,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->close();
 }
 
+$searchField = isset($_GET['field']) ? $_GET['field'] : '';
+$searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
+
 $sql = "SELECT title, description, status FROM PullRequests";
-$result = $conn->query($sql);
+if ($searchField && $searchTerm) {
+    $sql .= " WHERE $searchField LIKE ?";
+}
+
+$stmt = $conn->prepare($sql);
+if ($searchField && $searchTerm) {
+    $searchTermWrapped = "%$searchTerm%";
+    $stmt->bind_param("s", $searchTermWrapped);
+}
+$stmt->execute();
+$result = $stmt->get_result();
 
 echo "<h1>Pull Requests</h1>";
 
@@ -40,6 +53,26 @@ echo "<form method='post' action=''>
         <button type='submit' class='btn btn-primary'>Add Pull Request</button>
       </form>";
 
+echo "<br>";
+
+echo "<form method='get' action=''>
+        <div class='form-group'>
+            <label for='search'>Search:</label>
+            <input type='text' class='form-control' id='search' name='search' value='" . htmlspecialchars($searchTerm) . "'>
+        </div>
+        <div class='form-group'>
+            <label for='field'>Search By:</label>
+            <select class='form-control' id='field' name='field'>
+                <option value='title'" . ($searchField == 'title' ? ' selected' : '') . ">Title</option>
+                <option value='description'" . ($searchField == 'description' ? ' selected' : '') . ">Description</option>
+                <option value='status'" . ($searchField == 'status' ? ' selected' : '') . ">Status</option>
+            </select>
+        </div>
+        <button type='submit' class='btn btn-primary'>Search</button>
+      </form>";
+
+echo "<br>";
+
 if ($result->num_rows > 0) {
     echo "<table class='table table-bordered'>
             <thead class='thead-light'>
@@ -62,6 +95,7 @@ if ($result->num_rows > 0) {
     echo "<div class='alert alert-warning mt-2' role='alert'>No pull requests found.</div>";
 }
 
+$stmt->close();
 closeConnection($conn);
 include '../includes/footer.php';
 ?>

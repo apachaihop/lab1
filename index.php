@@ -1,16 +1,40 @@
 <?php
 include './includes/header.php';
 include './src/connection.php';
+try {
+    $conn = getConnection();
 
-$conn = getConnection();
+    $repoCount = $conn->query("SELECT COUNT(*) AS count FROM Repositories")->fetch_assoc()['count'];
+    $issueCount = $conn->query("SELECT COUNT(*) AS count FROM Issues")->fetch_assoc()['count'];
+    $prCount = $conn->query("SELECT COUNT(*) AS count FROM PullRequests")->fetch_assoc()['count'];
+    $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
 
-$repoCount = $conn->query("SELECT COUNT(*) AS count FROM Repositories")->fetch_assoc()['count'];
-$issueCount = $conn->query("SELECT COUNT(*) AS count FROM Issues")->fetch_assoc()['count'];
-$prCount = $conn->query("SELECT COUNT(*) AS count FROM PullRequests")->fetch_assoc()['count'];
-$userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
-
-closeConnection($conn);
+    closeConnection($conn);
+} catch (Exception $e) {
+    $errorMessage = $e->getMessage();
+    $repoCount = $issueCount = $prCount = $userCount = 0;
+    echo "<div class='toast-container position-absolute top-100 end-0 p-3'>
+  <div id='liveToast' class='toast' role='alert' aria-live='assertive' aria-atomic='true'>
+    <div class='toast-header'>
+      <strong class='me-auto'>Bootstrap</strong>
+      <small>11 mins ago</small>
+      <button type='button' class='btn-close' data-bs-dismiss='toast' aria-label='Close'></button>
+    </div>
+    <div class='toast-body'>
+      Hello, world! This is a toast message.
+    </div>
+  </div>
+</div>";
+    echo "<script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var toastEl = document.getElementById('liveToast');
+                var toast = new bootstrap.Toast(toastEl);
+                toast.show();
+            });
+          </script>";
+}
 ?>
+
 
 <h1>Welcome to the VCS Project</h1>
 <p>Select an option from the navigation menu to get started.</p>
