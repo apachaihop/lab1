@@ -1,7 +1,7 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 $sql = "SELECT review FROM Reviews";
 $result = $conn->query($sql);
@@ -26,5 +26,10 @@ if ($result->num_rows > 0) {
 }
 
 closeConnection($conn);
+}
+catch(Exception $e){
+    $errorMessage = $e->getMessage();
+    echo "<div class='alert alert-danger mt-2' role='alert'>An error occurred: " . $errorMessage . "</div>";
+}
 include '../includes/footer.php';
 ?>

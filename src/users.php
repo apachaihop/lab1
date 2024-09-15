@@ -1,7 +1,7 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 
 $searchField = isset($_GET['field']) ? $_GET['field'] : '';
@@ -61,5 +61,9 @@ if ($result->num_rows > 0) {
 
 $stmt->close();
 closeConnection($conn);
+}
+catch(Exception $e){
+    echo "<div class='alert alert-danger mt-2' role='alert'>An error occurred: " . $e->getMessage() . "</div>";
+}
 include '../includes/footer.php';
 ?>

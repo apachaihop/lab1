@@ -13,7 +13,19 @@ main {
 }
 
 .footer {
-    background-color: #f8f9fa;
+    background-color: #e8ecf0;
     padding: 1rem 0;
     text-align: center;
+}
+
+.alert {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: red;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    display: none;
 }

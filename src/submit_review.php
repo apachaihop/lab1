@@ -7,6 +7,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         echo "Review cannot be empty.";
         exit;
     }
+    
+    if (strlen($review) > 1000) {
+        echo "Review cannot be longer than 1000 characters.";
+        exit;
+    }
+
     $conn = getConnection();
 
     $stmt = $conn->prepare("INSERT INTO Reviews (review) VALUES (?)");

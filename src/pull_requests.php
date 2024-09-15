@@ -2,6 +2,7 @@
 include 'connection.php';
 include '../includes/header.php';
 
+try{
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['title'])) {
@@ -141,5 +142,10 @@ if ($result->num_rows > 0) {
 
 $stmt->close();
 closeConnection($conn);
+}
+catch(Exception $e){
+    $errorMessage =$e->getMessage();
+    echo "<div class='alert alert-danger mt-2' role='alert'>An error occurred: " . $errorMessage . "</div>";
+}
 include '../includes/footer.php';
 ?>

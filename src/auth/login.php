@@ -1,7 +1,7 @@
 <?php
 session_start();
 include '../connection.php';
-
+try{
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -26,6 +26,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 closeConnection($conn);
+}catch (Exception $e) {
+    $errorMessage = "An unexpected error occurred: " . $e->getMessage();
+    $repoCount = $issueCount = $prCount = $userCount = 0;
+
+    // Add the following block to display more context about the error
+    echo "<script type='text/javascript'>
+            let errorDetails = 'An error occurred while processing the data.\\n\\n';
+            errorDetails += 'Possible causes could include:\\n';
+            errorDetails += '- Database connection issue\\n';
+            errorDetails += '- Query failure\\n';
+            errorDetails += '- Invalid data\\n\\n';
+            errorDetails += 'Technical details: " . addslashes($errorMessage) . "';
+            alert(errorDetails);
+          </script>";
+}
 ?>
 
 <!DOCTYPE html>
@@ -39,7 +54,10 @@ closeConnection($conn);
 </head>
 <body>
     <div class="container">
-        <h2>Login</h2>
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Login</h2>
+            <button onclick="window.location.href='/lab1/index.php'" type="button" class="btn btn-secondary">Back to Main Page</button>
+        </div>
         <?php if (isset($error)): ?>
             <div class="alert alert-danger"><?php echo $error; ?></div>
         <?php endif; ?>
@@ -54,6 +72,7 @@ closeConnection($conn);
             </div>
             <button type="submit" class="btn btn-primary">Login</button>
         </form>
+        <p class="mt-3">Don't have an account? <a href="/lab1/auth/register.php">Register here</a></p>
     </div>
 </body>
 </html>

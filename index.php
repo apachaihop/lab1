@@ -11,30 +11,21 @@ try {
 
     closeConnection($conn);
 } catch (Exception $e) {
-    $errorMessage = $e->getMessage();
+    $errorMessage = "An unexpected error occurred: " . $e->getMessage();
     $repoCount = $issueCount = $prCount = $userCount = 0;
-    echo "<div class='toast-container position-absolute top-100 end-0 p-3'>
-  <div id='liveToast' class='toast' role='alert' aria-live='assertive' aria-atomic='true'>
-    <div class='toast-header'>
-      <strong class='me-auto'>Bootstrap</strong>
-      <small>11 mins ago</small>
-      <button type='button' class='btn-close' data-bs-dismiss='toast' aria-label='Close'></button>
-    </div>
-    <div class='toast-body'>
-      Hello, world! This is a toast message.
-    </div>
-  </div>
-</div>";
-    echo "<script>
-            document.addEventListener('DOMContentLoaded', function () {
-                var toastEl = document.getElementById('liveToast');
-                var toast = new bootstrap.Toast(toastEl);
-                toast.show();
-            });
+
+    // Add the following block to display more context about the error
+    echo "<script type='text/javascript'>
+            let errorDetails = 'An error occurred while processing the data.\\n\\n';
+            errorDetails += 'Possible causes could include:\\n';
+            errorDetails += '- Database connection issue\\n';
+            errorDetails += '- Query failure\\n';
+            errorDetails += '- Invalid data\\n\\n';
+            errorDetails += 'Technical details: " . addslashes($errorMessage) . "';
+            alert(errorDetails);
           </script>";
 }
 ?>
-
 
 <h1>Welcome to the VCS Project</h1>
 <p>Select an option from the navigation menu to get started.</p>
