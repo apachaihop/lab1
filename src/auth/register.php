@@ -2,52 +2,63 @@
 session_start();
 include '../connection.php';
 
-try{
-$conn = getConnection();
+try {
+    $conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = htmlspecialchars($_POST['username']);
-    $email = htmlspecialchars($_POST['email']);
-    $password = htmlspecialchars($_POST['password']);
-    
-    $minLength = 8; 
-    $specialSymbols = ['!', '@', '#', '$', '%', '^', '&', '*'];
-    
-    if (strlen($password) < $minLength) {
-        $error = "Password should be at least $minLength characters long.";
-    } elseif (!preg_match('/[0-9]/', $password)) {
-        $error = "Password should contain at least one digit.";
-    } elseif (!preg_match('/[A-Z]/', $password)) {
-        $error = "Password should contain at least one uppercase letter.";
-    } elseif (!preg_match('/[a-z]/', $password)) {
-        $error = "Password should contain at least one lowercase letter.";
-    } elseif (strpbrk($password, implode('', $specialSymbols)) === false) {
-        $error = "Password should contain at least one special symbol: " . implode(', ', $specialSymbols);
-    } else {
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $username = htmlspecialchars($_POST['username']);
+        $email = htmlspecialchars($_POST['email']);
+        $password = htmlspecialchars($_POST['password']);
 
-        $stmt = $conn->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $username, $email, $hashed_password);
+        // Валидация пароля
+        $minLength = 8; 
+        $specialSymbols = ['!', '@', '#', '$', '%', '^', '&', '*'];
 
-        if ($stmt->execute()) {
-            $_SESSION['user_id'] = $stmt->insert_id;
-            header("Location: /lab1/index.php");
-            exit();
+        if (strlen($password) < $minLength) {
+            $error = "Password should be at least $minLength characters long.";
+        } elseif (!preg_match('/[0-9]/', $password)) {
+            $error = "Password should contain at least one digit.";
+        } elseif (!preg_match('/[A-Z]/', $password)) {
+            $error = "Password should contain at least one uppercase letter.";
+        } elseif (!preg_match('/[a-z]/', $password)) {
+            $error = "Password should contain at least one lowercase letter.";
+        } elseif (strpbrk($password, implode('', $specialSymbols)) === false) {
+            $error = "Password should contain at least one special symbol: " . implode(', ', $specialSymbols);
         } else {
-            $error = "Error: " . $stmt->error;
+            // Проверяем наличие пользователя с таким же email или username
+            $stmt = $conn->prepare("SELECT user_id FROM Users WHERE email = ? OR username = ?");
+            $stmt->bind_param("ss", $email, $username);
+            $stmt->execute();
+            $stmt->store_result();
+
+            if ($stmt->num_rows > 0) {
+                $error = "Email or username already exists. Please choose another.";
+            } else {
+                // Хэшируем пароль
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+                // Вставляем нового пользователя в базу данных
+                $stmt = $conn->prepare("INSERT INTO Users (username, email, password_hash) VALUES (?, ?, ?)");
+                $stmt->bind_param("sss", $username, $email, $hashed_password);
+
+                if ($stmt->execute()) {
+                    $_SESSION['user_id'] = $stmt->insert_id;
+                    header("Location: /lab1/index.php");
+                    exit();
+                } else {
+                    $error = "Error: " . $stmt->error;
+                }
+            }
+
+            $stmt->close();
         }
-
-        $stmt->close();
     }
-}
 
-closeConnection($conn);
-}
-catch (Exception $e) {
+    closeConnection($conn);
+} catch (Exception $e) {
     $errorMessage = "An unexpected error occurred: " . $e->getMessage();
-    $repoCount = $issueCount = $prCount = $userCount = 0;
 
-    // Add the following block to display more context about the error
+    // Скрипт для вывода ошибок
     echo "<script type='text/javascript'>
             let errorDetails = 'An error occurred while processing the data.\\n\\n';
             errorDetails += 'Possible causes could include:\\n';
