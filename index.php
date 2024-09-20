@@ -11,34 +11,17 @@ try {
 
     closeConnection($conn);
 } catch (Exception $e) {
-    $errorMessage = $e->getMessage();
+    $error = "Error: Sql connection refused";
     $repoCount = $issueCount = $prCount = $userCount = 0;
-    echo "<div class='toast-container position-absolute top-100 end-0 p-3'>
-  <div id='liveToast' class='toast' role='alert' aria-live='assertive' aria-atomic='true'>
-    <div class='toast-header'>
-      <strong class='me-auto'>Bootstrap</strong>
-      <small>11 mins ago</small>
-      <button type='button' class='btn-close' data-bs-dismiss='toast' aria-label='Close'></button>
-    </div>
-    <div class='toast-body'>
-      Hello, world! This is a toast message.
-    </div>
-  </div>
-</div>";
-    echo "<script>
-            document.addEventListener('DOMContentLoaded', function () {
-                var toastEl = document.getElementById('liveToast');
-                var toast = new bootstrap.Toast(toastEl);
-                toast.show();
-            });
-          </script>";
 }
 ?>
 
 
 <h1>Welcome to the VCS Project</h1>
 <p>Select an option from the navigation menu to get started.</p>
-
+<?php if (isset($error)): ?>
+            <div class="alert alert-danger"><?php echo $error; ?></div>
+        <?php endif; ?>
 <div class="row">
     <div class="col-md-3">
         <div class="card text-white bg-primary mb-3">

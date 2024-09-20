@@ -1,12 +1,19 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 $sql = "SELECT review FROM Reviews";
 $result = $conn->query($sql);
-
+}
+catch (Exception $e) {
+    $error = "Error: Sql connection refused";
+}
 echo "<h1>Reviews</h1>";
+if($error)
+{
+    echo "<div class='alert alert-danger'> $error</div>";
+}
 if ($result->num_rows > 0) {
     echo "<table class='table table-bordered'>
             <thead class='thead-light'>

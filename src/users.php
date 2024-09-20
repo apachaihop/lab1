@@ -1,7 +1,7 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 
 $searchField = isset($_GET['field']) ? $_GET['field'] : '';
@@ -19,9 +19,17 @@ if ($searchField && $searchTerm) {
 }
 $stmt->execute();
 $result = $stmt->get_result();
+}
+catch (Exception $e) {
+    $error = "Error: Sql connection refused";
+}
 
 echo "<h1>Users</h1>";
 
+if($error)
+{
+    echo "<div class='alert alert-danger'> $error</div>";
+}
 echo "<form method='get' action=''>
         <div class='form-group'>
             <label for='search'>Search:</label>

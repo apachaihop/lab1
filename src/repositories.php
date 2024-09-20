@@ -1,7 +1,7 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
@@ -29,9 +29,16 @@ if ($searchField && $searchTerm) {
 }
 $stmt->execute();
 $result = $stmt->get_result();
+}
+catch (Exception $e) {
+    $error = "Error: Sql connection refused";
+}
 
 echo "<h1>Repositories</h1>";
-
+if($error)
+{
+    echo "<div class='alert alert-danger'> $error</div>";
+}
 echo "<form method='post' action=''>
         <div class='form-group'>
             <label for='name'>Name:</label>

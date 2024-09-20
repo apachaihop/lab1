@@ -1,7 +1,7 @@
 <?php
 session_start();
 include '../connection.php';
-
+try{
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -38,6 +38,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         $stmt->close();
     }
+    
+}
+}
+catch(Exception $e)
+{
+    $error= "Error while SQL connection processing";
 }
 
 closeConnection($conn);
@@ -54,7 +60,10 @@ closeConnection($conn);
 </head>
 <body>
     <div class="container">
-        <h2>Register</h2>
+    <div class="d-flex justify-content-between align-items-center">
+            <h2>Register</h2>
+            <button onclick="window.location.href='/lab1/index.php'" type="button" class="btn btn-secondary">Back to Main Page</button>
+        </div>
         <?php if (isset($error)): ?>
             <div class="alert alert-danger"><?php echo $error; ?></div>
         <?php endif; ?>

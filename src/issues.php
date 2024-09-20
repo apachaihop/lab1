@@ -1,7 +1,7 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-
+try{
 $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -45,8 +45,16 @@ if ($stmt->execute() === false) {
 }
 
 $result = $stmt->get_result();
+}
+catch (Exception $e) {
+    $error = "Error: Sql connection refused";
+}
 
 echo "<h1>Issues</h1>";
+if($error)
+{
+    echo "<div class='alert alert-danger'> $error</div>";
+}
 
 echo "<form method='post' action=''>
         <div class='form-group'>
