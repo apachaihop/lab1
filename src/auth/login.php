@@ -66,7 +66,7 @@ closeConnection($conn);
             </div>
             <button type="submit" class="btn btn-primary">Login</button>
         </form>
-        <p class="mt-3">Don't have an account? <a href="/lab1/auth/register.php">Register here</a></p>
+        <p class="mt-3">Don't have an account? <a href="/lab1/src/auth/register.php">Register here</a></p>
     </div>
 </body>
 </html>
