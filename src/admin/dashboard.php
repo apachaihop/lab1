@@ -6,12 +6,7 @@ if (!isset($_SESSION['user_id']) || !$_SESSION['is_admin']) {
 }
 
 echo "<h1>Admin Dashboard</h1>";
-echo "<ul>
-    <li><a href='manage_users.php'>Manage Users</a></li>
-    <li><a href='manage_repositories.php'>Manage Repositories</a></li>
-    <li><a href='manage_issues.php'>Manage Issues</a></li>
-    <li><a href='manage_pull_requests.php'>Manage Pull Requests</a></li>
-</ul>";
+echo "Update soon";
 
 include '../../includes/footer.php';
 ?>
