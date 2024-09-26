@@ -5,14 +5,25 @@ try {
     $conn = getConnection();
 
     $user_id = $_SESSION['user_id'];
-    $stmt = $conn->prepare("
-        SELECT 
+    $stmt;
+    if (isset($_SESSION['is_admin']) || $_SESSION['is_admin']) {
+        $stmt = $conn->prepare("
+            SELECT 
+                (SELECT COUNT(*) FROM Repositories ) AS repoCount,
+                (SELECT COUNT(*) FROM Issues) AS issueCount,
+                (SELECT COUNT(*) FROM PullRequests ) AS prCount
+        ");
+    } else {
+        $stmt = $conn->prepare("
+            SELECT 
             (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
             (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
-            (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
-    ");
+                (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
+        ");
+        $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+    }
 
-    $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+
 
     $stmt->execute();
 
