@@ -1,42 +1,57 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-try{
-$conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
-    $name = htmlspecialchars($_POST['name']);
-    $description = htmlspecialchars($_POST['description']);
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /lab1/src/auth/login.php");
+    exit();
+}
 
-    $stmt = $conn->prepare("INSERT INTO Repositories (name, description) VALUES (?, ?)");
-    $stmt->bind_param("ss", $name, $description);
+try {
+    $conn = getConnection();
+    $user_id = $_SESSION['user_id'];
+
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
+        $name = htmlspecialchars($_POST['name']);
+        $description = htmlspecialchars($_POST['description']);
+
+        $stmt = $conn->prepare("INSERT INTO Repositories (name, description, user_id) VALUES (?, ?, ?)");
+        $stmt->bind_param("ssi", $name, $description, $user_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    $searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
+    $searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
+
+    $sql = "SELECT repo_id, name, description, user_id FROM Repositories";
+    if (!$_SESSION['is_admin']) {
+        $sql .= " WHERE user_id = ?";
+    }
+    if ($searchField && $searchTerm) {
+        $sql .= ($_SESSION['is_admin'] ? " WHERE" : " AND") . " $searchField LIKE ?";
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!$_SESSION['is_admin']) {
+        if ($searchField && $searchTerm) {
+            $searchTermWrapped = "%$searchTerm%";
+            $stmt->bind_param("is", $_SESSION['user_id'], $searchTermWrapped);
+        } else {
+            $stmt->bind_param("i", $_SESSION['user_id']);
+        }
+    } elseif ($searchField && $searchTerm) {
+        $searchTermWrapped = "%$searchTerm%";
+        $stmt->bind_param("s", $searchTermWrapped);
+    }
     $stmt->execute();
-    $stmt->close();
+    $result = $stmt->get_result();
+} catch (Exception $e) {
+    $error = "Error: " . $e->getMessage();
 }
 
-$searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
-$searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
-
-$sql = "SELECT repo_id, name, description FROM Repositories";
-if ($searchField && $searchTerm) {
-    $sql .= " WHERE $searchField LIKE ?";
-}
-
-$stmt = $conn->prepare($sql);
-if ($searchField && $searchTerm) {
-    $searchTermWrapped = "%$searchTerm%";
-    $stmt->bind_param("s", $searchTermWrapped);
-}
-$stmt->execute();
-$result = $stmt->get_result();
-}
-catch (Exception $e) {
-    $error = "Error: Sql connection refused";
-}
-
-echo "<h1>Repositories</h1>";
-if($error)
-{
+echo "<h1>My Repositories</h1>";
+if(isset($error)) {
     echo "<div class='alert alert-danger'> $error</div>";
 }
 echo "<form method='post' action=''>

@@ -12,14 +12,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = htmlspecialchars($_POST['username']);
     $password = htmlspecialchars($_POST['password']);
 
-    $stmt = $conn->prepare("SELECT user_id, password_hash FROM Users WHERE username = ?");
+    $stmt = $conn->prepare("SELECT user_id, password_hash, is_admin FROM Users WHERE username = ?");
     $stmt->bind_param("s", $username);
     $stmt->execute();
-    $stmt->bind_result($user_id, $hashed_password);
+    $stmt->bind_result($user_id, $hashed_password, $is_admin);
     $stmt->fetch();
 
     if (password_verify($password, $hashed_password)) {
         $_SESSION['user_id'] = $user_id;
+        $_SESSION['is_admin'] = $is_admin;
         header("Location: /lab1/index.php");
         exit();
     } else {

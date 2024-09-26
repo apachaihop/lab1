@@ -1,46 +1,54 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-try{
-$conn = getConnection();
+try {
+    $conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['title'])) {
-    $title = htmlspecialchars($_POST['title']);
-    $description = htmlspecialchars($_POST['description']);
-    $status = htmlspecialchars($_POST['status']);
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['title'])) {
+        $title = htmlspecialchars($_POST['title']);
+        $description = htmlspecialchars($_POST['description']);
+        $status = htmlspecialchars($_POST['status']);
+        $user_id = $_SESSION['user_id'];
 
-    $stmt = $conn->prepare("INSERT INTO PullRequests (title, description, status) VALUES (?, ?, ?)");
-    $stmt->bind_param("sss", $title, $description, $status);
+        $stmt = $conn->prepare("INSERT INTO PullRequests (title, description, status, user_id) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("sssi", $title, $description, $status, $user_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    $searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
+    $searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
+
+    $sql = "SELECT pr_id, title, description, status, user_id FROM PullRequests";
+    if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+        $sql .= " WHERE user_id = ?";
+    }
+    if ($searchField && $searchTerm) {
+        $sql .= (strpos($sql, 'WHERE') !== false ? " AND" : " WHERE") . " $searchField LIKE ?";
+    }
+
+    $stmt = $conn->prepare($sql);
+    if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+        if ($searchField && $searchTerm) {
+            $searchTermWrapped = "%$searchTerm%";
+            $stmt->bind_param("is", $_SESSION['user_id'], $searchTermWrapped);
+        } else {
+            $stmt->bind_param("i", $_SESSION['user_id']);
+        }
+    } elseif ($searchField && $searchTerm) {
+        $searchTermWrapped = "%$searchTerm%";
+        $stmt->bind_param("s", $searchTermWrapped);
+    }
     $stmt->execute();
-    $stmt->close();
+    $result = $stmt->get_result();
+} catch (Exception $e) {
+    $error = "Error: " . $e->getMessage();
 }
 
-$searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
-$searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
-
-$sql = "SELECT pr_id, title, description, status FROM PullRequests";
-if ($searchField && $searchTerm) {
-    $sql .= " WHERE $searchField LIKE ?";
-}
-
-$stmt = $conn->prepare($sql);
-if ($searchField && $searchTerm) {
-    $searchTermWrapped = "%$searchTerm%";
-    $stmt->bind_param("s", $searchTermWrapped);
-}
-$stmt->execute();
-$result = $stmt->get_result();
-}
-catch (Exception $e) {
-    $error = "Error: Sql connection refused";
-}
-
-echo "<h1>Pull Requests</h1>";
-if($error)
-{
+echo "<h1>My Pull Requests</h1>";
+if(isset($error)) {
     echo "<div class='alert alert-danger'> $error</div>";
 }
-
 echo "<form method='post' action=''>
         <div class='form-group'>
             <label for='title'>Title:</label>

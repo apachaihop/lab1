@@ -1,58 +1,73 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-try{
-$conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $title = htmlspecialchars($_POST['title']);
-    $description = htmlspecialchars($_POST['description']);
-    $status = htmlspecialchars($_POST['status']);
+if (!isset($_SESSION['user_id'])) {
+    header("Location: /lab1/src/auth/login.php");
+    exit();
+}
 
-    $stmt = $conn->prepare("INSERT INTO Issues (title, description, status) VALUES (?, ?, ?)");
+try {
+    $conn = getConnection();
+    $user_id = $_SESSION['user_id'];
+
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $title = htmlspecialchars($_POST['title']);
+        $description = htmlspecialchars($_POST['description']);
+        $status = htmlspecialchars($_POST['status']);
+
+        $stmt = $conn->prepare("INSERT INTO Issues (title, description, status, user_id) VALUES (?, ?, ?, ?)");
+        if ($stmt === false) {
+            die('Prepare failed: ' . htmlspecialchars($conn->error));
+        }
+
+        $stmt->bind_param("sssi", $title, $description, $status, $user_id);
+        if ($stmt->execute() === false) {
+            die('Execute failed: ' . htmlspecialchars($stmt->error));
+        }
+
+        $stmt->close();
+    }
+
+    $searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
+    $searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
+
+    $sql = "SELECT issue_id, title, description, status, user_id FROM Issues";
+    if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+        $sql .= " WHERE user_id = ?";
+    }
+    if ($searchField && $searchTerm) {
+        $sql .= (strpos($sql, 'WHERE') !== false ? " AND" : " WHERE") . " $searchField LIKE ?";
+    }
+
+    $stmt = $conn->prepare($sql);
     if ($stmt === false) {
         die('Prepare failed: ' . htmlspecialchars($conn->error));
     }
 
-    $stmt->bind_param("sss", $title, $description, $status);
+    if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+        if ($searchField && $searchTerm) {
+            $searchTermWrapped = "%$searchTerm%";
+            $stmt->bind_param("is", $user_id, $searchTermWrapped);
+        } else {
+            $stmt->bind_param("i", $user_id);
+        }
+    } elseif ($searchField && $searchTerm) {
+        $searchTermWrapped = "%$searchTerm%";
+        $stmt->bind_param("s", $searchTermWrapped);
+    }
+
     if ($stmt->execute() === false) {
         die('Execute failed: ' . htmlspecialchars($stmt->error));
     }
 
-    $stmt->close();
+    $result = $stmt->get_result();
+} catch (Exception $e) {
+    $error = "Error: " . $e->getMessage();
 }
 
-$searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
-$searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
-
-$sql = "SELECT issue_id, title, description, status FROM Issues";
-if ($searchField && $searchTerm) {
-    $sql .= " WHERE $searchField LIKE ?";
-}
-
-$stmt = $conn->prepare($sql);
-if ($stmt === false) {
-    die('Prepare failed: ' . htmlspecialchars($conn->error));
-}
-
-if ($searchField && $searchTerm) {
-    $searchTermWrapped = "%$searchTerm%";
-    $stmt->bind_param("s", $searchTermWrapped);
-}
-
-if ($stmt->execute() === false) {
-    die('Execute failed: ' . htmlspecialchars($stmt->error));
-}
-
-$result = $stmt->get_result();
-}
-catch (Exception $e) {
-    $error = "Error: Sql connection refused";
-}
-
-echo "<h1>Issues</h1>";
-if($error)
-{
+echo "<h1>My Issues</h1>";
+if(isset($error)) {
     echo "<div class='alert alert-danger'> $error</div>";
 }
 
