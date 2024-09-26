@@ -6,7 +6,7 @@ try {
 
     $user_id = $_SESSION['user_id'];
     $stmt;
-    if (isset($_SESSION['is_admin']) || $_SESSION['is_admin']) {
+    if ($_SESSION['is_admin']) {
         $stmt = $conn->prepare("
             SELECT 
                 (SELECT COUNT(*) FROM Repositories ) AS repoCount,
