@@ -4,9 +4,23 @@ include './src/connection.php';
 try {
     $conn = getConnection();
 
-    $repoCount = $conn->query("SELECT COUNT(*) AS count FROM Repositories")->fetch_assoc()['count'];
-    $issueCount = $conn->query("SELECT COUNT(*) AS count FROM Issues")->fetch_assoc()['count'];
-    $prCount = $conn->query("SELECT COUNT(*) AS count FROM PullRequests")->fetch_assoc()['count'];
+    $user_id = $_SESSION['user_id'];
+    $stmt = $conn->prepare("
+        SELECT 
+            (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
+            (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
+            (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
+    ");
+
+    $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+
+    $stmt->execute();
+
+    $result = $stmt->get_result()->fetch_assoc();
+
+    $repoCount = $result['repoCount'];
+    $issueCount = $result['issueCount'];
+    $prCount = $result['prCount'];
     $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
 
     closeConnection($conn);
@@ -20,46 +34,59 @@ try {
 <h1>Welcome to the VCS Project</h1>
 <p>Select an option from the navigation menu to get started.</p>
 <?php if (isset($error)): ?>
-            <div class="alert alert-danger"><?php echo $error; ?></div>
-        <?php endif; ?>
+    <div class="alert alert-danger"><?php echo $error; ?></div>
+<?php endif; ?>
 <div class="row">
-    <div class="col-md-3">
-        <div class="card text-white bg-primary mb-3">
+    <!-- Repositories Card -->
+    <div class="col-md-3 d-flex">
+        <div class="card text-white bg-primary mb-3 flex-fill d-flex flex-column">
             <div class="card-header">Repositories</div>
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <h5 class="card-title"><?php echo $repoCount; ?></h5>
                 <p class="card-text">Total Repositories</p>
-                <a href="./src/repositories.php" class="btn btn-light">View Repositories</a>
+                <a href="./src/repositories.php" class="btn btn-light mt-auto">View Repositories</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-secondary mb-3">
+
+    <!-- Issues Card -->
+    <div class="col-md-3 d-flex">
+        <div class="card text-white bg-secondary mb-3 flex-fill d-flex flex-column">
             <div class="card-header">Issues</div>
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <h5 class="card-title"><?php echo $issueCount; ?></h5>
                 <p class="card-text">Total Issues</p>
-                <a href="./src/issues.php" class="btn btn-light">View Issues</a>
+                <a href="./src/issues.php" class="btn btn-light mt-auto">View Issues</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-success mb-3">
+
+    <!-- Pull Requests Card -->
+    <div class="col-md-3 d-flex">
+        <div class="card text-white bg-success mb-3 flex-fill d-flex flex-column">
             <div class="card-header">Pull Requests</div>
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <h5 class="card-title"><?php echo $prCount; ?></h5>
                 <p class="card-text">Total Pull Requests</p>
-                <a href="./src/pull_requests.php" class="btn btn-light">View Pull Requests</a>
+                <a href="./src/pull_requests.php" class="btn btn-light mt-auto">View Pull Requests</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-danger mb-3">
+
+    <!-- Users Card -->
+    <div class="col-md-3 d-flex">
+        <div class="card text-white bg-danger mb-3 flex-fill d-flex flex-column">
             <div class="card-header">Users</div>
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <h5 class="card-title"><?php echo $userCount; ?></h5>
                 <p class="card-text">Total Users</p>
-                <a href="./src/users.php" class="btn btn-light">View Users</a>
+                <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']): ?>
+                    <a href="./src/users.php" class="btn btn-light mt-auto">View Users</a>
+                <?php else: ?>
+                    <div class="mt-auto invisible">
+                        <span>&nbsp;</span>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>

@@ -1,33 +1,35 @@
 <?php
 include 'connection.php';
 include '../includes/header.php';
-try{
-$conn = getConnection();
-
-$searchField = isset($_GET['field']) ? $_GET['field'] : '';
-$searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
-
-$sql = "SELECT username, email FROM Users";
-if ($searchField && $searchTerm) {
-    $sql .= " WHERE $searchField LIKE ?";
+if (!isset($_SESSION['user_id']) || !$_SESSION['is_admin']) {
+    header("Location: /lab1/index.php");
+    exit();
 }
+try {
+    $conn = getConnection();
 
-$stmt = $conn->prepare($sql);
-if ($searchField && $searchTerm) {
-    $searchTermWrapped = "%$searchTerm%";
-    $stmt->bind_param("s", $searchTermWrapped);
-}
-$stmt->execute();
-$result = $stmt->get_result();
-}
-catch (Exception $e) {
+    $searchField = isset($_GET['field']) ? $_GET['field'] : '';
+    $searchTerm = isset($_GET['search']) ? $_GET['search'] : '';
+
+    $sql = "SELECT username, email FROM Users";
+    if ($searchField && $searchTerm) {
+        $sql .= " WHERE $searchField LIKE ?";
+    }
+
+    $stmt = $conn->prepare($sql);
+    if ($searchField && $searchTerm) {
+        $searchTermWrapped = "%$searchTerm%";
+        $stmt->bind_param("s", $searchTermWrapped);
+    }
+    $stmt->execute();
+    $result = $stmt->get_result();
+} catch (Exception $e) {
     $error = "Error: Sql connection refused";
 }
 
 echo "<h1>Users</h1>";
 
-if($error)
-{
+if ($error) {
     echo "<div class='alert alert-danger'> $error</div>";
 }
 echo "<form method='get' action=''>
@@ -56,10 +58,10 @@ if ($result->num_rows > 0) {
                 </tr>
             </thead>
             <tbody>";
-    while($row = $result->fetch_assoc()) {
+    while ($row = $result->fetch_assoc()) {
         echo "<tr>
-                <td>" . $row["username"]. "</td>
-                <td>" . $row["email"]. "</td>
+                <td>" . $row["username"] . "</td>
+                <td>" . $row["email"] . "</td>
               </tr>";
     }
     echo "</tbody></table>";
@@ -70,4 +72,3 @@ if ($result->num_rows > 0) {
 $stmt->close();
 closeConnection($conn);
 include '../includes/footer.php';
-?>
