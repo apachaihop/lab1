@@ -19,6 +19,26 @@ CREATE TABLE Repositories (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
+CREATE TABLE RepositoryComments (
+    comment_id INT AUTO_INCREMENT PRIMARY KEY,
+    repo_id INT,
+    user_id INT,
+    comment TEXT NOT NULL,
+    stars INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE CommentLikes (
+    like_id INT AUTO_INCREMENT PRIMARY KEY,
+    comment_id INT,
+    user_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES RepositoryComments(comment_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_like (comment_id, user_id)
+);
 
 CREATE TABLE Branches (
     branch_id INT AUTO_INCREMENT PRIMARY KEY,
