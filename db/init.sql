@@ -40,6 +40,16 @@ CREATE TABLE CommentLikes (
     UNIQUE KEY unique_like (comment_id, user_id)
 );
 
+CREATE TABLE RepositorySubscriptions (
+    subscription_id INT AUTO_INCREMENT PRIMARY KEY,
+    repo_id INT NOT NULL,
+    user_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id),
+    FOREIGN KEY (user_id) REFERENCES Users(user_id),
+    UNIQUE KEY (repo_id, user_id)
+);
+
 CREATE TABLE Branches (
     branch_id INT AUTO_INCREMENT PRIMARY KEY,
     repo_id INT,

@@ -10,7 +10,7 @@ try {
     $searchField = isset($_GET['field']) ? htmlspecialchars($_GET['field']) : '';
     $searchTerm = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
 
-    $sql = "SELECT repo_id, name, description, user_id FROM Repositories";
+    $sql = "SELECT repo_id, name, description, user_id, username  FROM Repositories join Users using(user_id)";
     if ($searchField && $searchTerm) {
         // Prevent SQL Injection by allowing only specific fields
         $allowedFields = ['name', 'description'];
@@ -146,13 +146,41 @@ try {
         $ownerCheckStmt->close();
     }
 
+    // Handle repository subscription
+    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['subscribe_repo_id']) && isset($_SESSION['user_id'])) {
+        $repo_id = intval($_POST['subscribe_repo_id']);
+        $user_id = $_SESSION['user_id'];
+
+        // Check if already subscribed
+        $checkSubscriptionStmt = $conn->prepare("SELECT * FROM RepositorySubscriptions WHERE repo_id = ? AND user_id = ?");
+        $checkSubscriptionStmt->bind_param("ii", $repo_id, $user_id);
+        $checkSubscriptionStmt->execute();
+        $checkSubscriptionStmt->store_result();
+
+        if ($checkSubscriptionStmt->num_rows == 0) {
+            // Subscribe
+            $subscribeStmt = $conn->prepare("INSERT INTO RepositorySubscriptions (repo_id, user_id) VALUES (?, ?)");
+            $subscribeStmt->bind_param("ii", $repo_id, $user_id);
+            $subscribeStmt->execute();
+            $subscribeStmt->close();
+        } else {
+            // Unsubscribe
+            $unsubscribeStmt = $conn->prepare("DELETE FROM RepositorySubscriptions WHERE repo_id = ? AND user_id = ?");
+            $unsubscribeStmt->bind_param("ii", $repo_id, $user_id);
+            $unsubscribeStmt->execute();
+            $unsubscribeStmt->close();
+        }
+
+        $checkSubscriptionStmt->close();
+    }
+
     // Handle sorting
     $sortOrder = "C.created_at DESC"; // Default sort
     if (isset($_GET['sort']) && $_GET['sort'] == 'likes') {
         $sortOrder = "C.stars DESC";
     }
 } catch (Exception $e) {
-    $error = "Error: Sql connection refused";
+    $error = "Error: " . $e->getMessage();
 }
 
 ?>
@@ -194,8 +222,27 @@ try {
             </div>
             <div class="card-body">
                 <p><?= htmlspecialchars($repo['description']) ?></p>
-                <h5>Comments</h5>
+                <p>Created by: <?= htmlspecialchars($repo['username']) ?></p>
 
+                <!-- Add Subscribe/Unsubscribe Button -->
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <?php
+                    $subscribeCheckStmt = $conn->prepare("SELECT * FROM RepositorySubscriptions WHERE repo_id = ? AND user_id = ?");
+                    $subscribeCheckStmt->bind_param("ii", $repo['repo_id'], $_SESSION['user_id']);
+                    $subscribeCheckStmt->execute();
+                    $subscribeCheckStmt->store_result();
+                    $isSubscribed = $subscribeCheckStmt->num_rows > 0;
+                    $subscribeCheckStmt->close();
+                    ?>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="subscribe_repo_id" value="<?= $repo['repo_id'] ?>">
+                        <button type="submit" class="btn btn-sm <?= $isSubscribed ? 'btn-danger' : 'btn-primary' ?>">
+                            <?= $isSubscribed ? 'Unsubscribe' : 'Subscribe' ?>
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <h5>Comments</h5>
                 <!-- Display Comments -->
                 <?php
                 $repo_id = $repo['repo_id'];

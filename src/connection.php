@@ -5,7 +5,8 @@ $username = "root";
 $password = "";
 $dbname = "lab1";
 
-function getConnection() {
+function getConnection()
+{
     global $servername, $username, $password, $dbname;
     $conn = new mysqli($servername, $username, $password, $dbname);
 
@@ -16,9 +17,9 @@ function getConnection() {
     return $conn;
 }
 
-function closeConnection($conn) {
+function closeConnection($conn)
+{
     if ($conn) {
         $conn->close();
     }
 }
-?>

@@ -34,6 +34,12 @@ session_start();
                     <li class="nav-item"><a class="nav-link" href="/lab1/src/users.php">Users</a></li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                         <li class="nav-item"><a class="nav-link" href="/lab1/src/my_repositories.php">My Repos</a></li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/lab1/src/my_subscribers.php">My Subscribers</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/lab1/src/my_subscriptions.php">My Subscriptions</a>
+                        </li>
                     <?php endif; ?>
                 </ul>
                 <ul class="navbar-nav ml-auto">
