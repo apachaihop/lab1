@@ -18,7 +18,6 @@ try {
         if (isset($_POST['username']) && isset($_POST['password'])) {
             $username = htmlspecialchars($_POST['username']);
             $password = htmlspecialchars($_POST['password']);
-            echo "Received POST data.<br>"; // Debugging statement
         } else {
             throw new Exception("Username or password not set in POST data.");
         }
@@ -27,36 +26,30 @@ try {
         if (!$stmt) {
             throw new Exception("Prepare failed: (" . $conn->errno . ") " . $conn->error);
         }
-        echo "Prepared the SQL statement.<br>"; // Debugging statement
 
         $stmt->bind_param("s", $username);
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: (" . $stmt->errno . ") " . $stmt->error);
         }
-        echo "Executed the SQL statement.<br>"; // Debugging statement
 
         $stmt->bind_result($user_id, $hashed_password, $is_admin);
         if (!$stmt->fetch()) {
             throw new Exception("Fetch failed: No user found with that username.");
         }
-        echo "Fetched user data.<br>"; // Debugging statement
 
         if (password_verify($password, $hashed_password)) {
             $_SESSION['user_id'] = $user_id;
             $_SESSION['is_admin'] = $is_admin;
-            echo "Password verified. Redirecting..."; // Debugging statement
             header("Location: /lab1/index.php");
             exit();
         } else {
             $error = "Invalid username or password";
-            echo "Password verification failed.<br>"; // Debugging statement
         }
 
         $stmt->close();
     }
 } catch (Exception $e) {
     $error = "Error while SQL connection processing: " . $e->getMessage();
-    echo $error; // Display the detailed error message
 } finally {
     if (isset($conn)) {
         closeConnection($conn);

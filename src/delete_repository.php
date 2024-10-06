@@ -11,61 +11,42 @@ $conn = getConnection();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $repo_id = htmlspecialchars($_POST['repo_id']);
+    $user_id = $_SESSION['user_id'];
 
-    $sql = "DELETE FROM Repositories WHERE repo_id = ?";
-    if (!$_SESSION['is_admin']) {
-        $sql .= " AND user_id = ?";
-    }
+    // Start a transaction
+    $conn->begin_transaction();
 
-    $stmt = $conn->prepare($sql);
-    if ($stmt === false) {
-        die('Prepare failed: ' . htmlspecialchars($conn->error));
-    }
+    try {
+        // First, delete all subscriptions for this repository
+        $deleteSubscriptionsStmt = $conn->prepare("DELETE FROM RepositorySubscriptions WHERE repo_id = ?");
+        $deleteSubscriptionsStmt->bind_param("i", $repo_id);
+        $deleteSubscriptionsStmt->execute();
+        $deleteSubscriptionsStmt->close();
 
-    if ($_SESSION['is_admin']) {
-        $stmt->bind_param("i", $repo_id);
-    } else {
-        $stmt->bind_param("ii", $repo_id, $_SESSION['user_id']);
-    }
+        // Now, delete the repository
+        $deleteRepoStmt = $conn->prepare("DELETE FROM Repositories WHERE repo_id = ? AND user_id = ?");
+        $deleteRepoStmt->bind_param("ii", $repo_id, $user_id);
+        $deleteRepoStmt->execute();
 
-    if ($stmt->execute() === false) {
-        die('Execute failed: ' . htmlspecialchars($stmt->error));
-    }
-
-    $stmt->close();
-}
-
-try {
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete_repository_id'])) {
-        $conn = getConnection();
-        $repo_id = intval($_POST['delete_repository_id']);
-        $user_id = $_SESSION['user_id'];
-
-        // Verify ownership
-        $stmt = $conn->prepare("SELECT repo_id FROM Repositories WHERE repo_id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $repo_id, $user_id);
-        $stmt->execute();
-        $stmt->store_result();
-
-        if ($stmt->num_rows > 0) {
-            $stmt->close();
-            $deleteStmt = $conn->prepare("DELETE FROM Repositories WHERE repo_id = ?");
-            $deleteStmt->bind_param("i", $repo_id);
-            if ($deleteStmt->execute()) {
-                $deleteStmt->close();
-                closeConnection($conn);
-                header("Location: my_repositories.php?success=1");
-                exit();
-            } else {
-                throw new Exception("Error deleting repository: " . $deleteStmt->error);
-            }
-        } else {
-            throw new Exception("Unauthorized action.");
+        if ($deleteRepoStmt->affected_rows == 0) {
+            throw new Exception("Unable to delete repository. It may not exist or you may not have permission.");
         }
+
+        $deleteRepoStmt->close();
+
+        // If we've made it this far without errors, commit the transaction
+        $conn->commit();
+
+        $_SESSION['success_message'] = "Repository deleted successfully.";
+    } catch (Exception $e) {
+        // An error occurred; rollback the transaction
+        $conn->rollback();
+        $_SESSION['error_message'] = "Error deleting repository: " . $e->getMessage();
     }
-} catch (Exception $e) {
-    $error = $e->getMessage();
-    // Optionally, redirect back with error message
-    header("Location: my_repositories.php?error=" . urlencode($error));
-    exit();
 }
+
+closeConnection($conn);
+
+// Redirect back to the repositories page
+header("Location: my_repositories.php");
+exit();

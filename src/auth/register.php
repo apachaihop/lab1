@@ -5,16 +5,16 @@ if (isset($_SESSION['user_id'])) {
     header("Location: /lab1/index.php");
     exit();
 }
-try{
-$conn = getConnection();
+try {
+    $conn = getConnection();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $username = htmlspecialchars($_POST['username']);
         $email = htmlspecialchars($_POST['email']);
         $password = htmlspecialchars($_POST['password']);
 
         // Валидация пароля
-        $minLength = 8; 
+        $minLength = 8;
         $specialSymbols = ['!', '@', '#', '$', '%', '^', '&', '*'];
 
         if (strlen($password) < $minLength) {
@@ -56,10 +56,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->close();
         }
     }
-}
-catch(Exception $e)
-{
-    $error= "Error while SQL connection processing";
+} catch (Exception $e) {
+    $error = "Error while SQL connection processing";
 }
 
 closeConnection($conn);
@@ -67,6 +65,7 @@ closeConnection($conn);
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -74,9 +73,10 @@ closeConnection($conn);
     <link rel="stylesheet" href="/lab1/styles/styles.css">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
+
 <body>
     <div class="container">
-    <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center">
             <h2>Register</h2>
             <button onclick="window.location.href='/lab1/index.php'" type="button" class="btn btn-secondary">Back to Main Page</button>
         </div>
@@ -100,4 +100,5 @@ closeConnection($conn);
         </form>
     </div>
 </body>
+
 </html>

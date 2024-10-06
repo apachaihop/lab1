@@ -19,12 +19,13 @@ try {
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_repository'])) {
         $name = htmlspecialchars(trim($_POST['name']));
         $description = htmlspecialchars(trim($_POST['description']));
+        $language = htmlspecialchars(trim($_POST['language']));
 
-        if (empty($name) || empty($description)) {
-            $error = "Both Name and Description are required.";
+        if (empty($name) || empty($description) || empty($language)) {
+            $error = "Both Name, Description, and Language are required.";
         } else {
-            $stmt = $conn->prepare("INSERT INTO Repositories (name, description, user_id) VALUES (?, ?, ?)");
-            $stmt->bind_param("ssi", $name, $description, $user_id);
+            $stmt = $conn->prepare("INSERT INTO Repositories (name, description, language, user_id) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("sssi", $name, $description, $language, $user_id);
             if ($stmt->execute()) {
                 $success = "Repository added successfully.";
             } else {
@@ -65,9 +66,10 @@ try {
         $repo_id = intval($_POST['update_repository_id']);
         $name = htmlspecialchars(trim($_POST['name']));
         $description = htmlspecialchars(trim($_POST['description']));
+        $language = htmlspecialchars(trim($_POST['language']));
 
-        if (empty($name) || empty($description)) {
-            $error = "Both Name and Description are required.";
+        if (empty($name) || empty($description) || empty($language)) {
+            $error = "Both Name, Description, and Language are required.";
         } else {
             // Verify ownership
             $stmt = $conn->prepare("SELECT repo_id FROM Repositories WHERE repo_id = ? AND user_id = ?");
@@ -77,8 +79,8 @@ try {
 
             if ($stmt->num_rows > 0) {
                 $stmt->close();
-                $updateStmt = $conn->prepare("UPDATE Repositories SET name = ?, description = ? WHERE repo_id = ?");
-                $updateStmt->bind_param("ssi", $name, $description, $repo_id);
+                $updateStmt = $conn->prepare("UPDATE Repositories SET name = ?, description = ?, language = ? WHERE repo_id = ?");
+                $updateStmt->bind_param("sssi", $name, $description, $language, $repo_id);
                 if ($updateStmt->execute()) {
                     $success = "Repository updated successfully.";
                 } else {
@@ -93,7 +95,7 @@ try {
     }
 
     // Fetch User's Repositories
-    $stmt = $conn->prepare("SELECT repo_id, name, description FROM Repositories WHERE user_id = ?");
+    $stmt = $conn->prepare("SELECT repo_id, name, description, language FROM Repositories WHERE user_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $reposResult = $stmt->get_result();
@@ -130,6 +132,10 @@ try {
                 <textarea class="form-control" id="description" name="description" rows="3"
                     placeholder="Enter repository description" required></textarea>
             </div>
+            <div class="form-group">
+                <label for="language">Programming Language:</label>
+                <input type="text" class="form-control" id="language" name="language" placeholder="e.g., Python, JavaScript" required>
+            </div>
             <button type="submit" class="btn btn-primary">Add Repository</button>
         </form>
     </div>
@@ -147,6 +153,7 @@ try {
                     <tr>
                         <th>Name</th>
                         <th>Description</th>
+                        <th>Language</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -155,6 +162,7 @@ try {
                         <tr>
                             <td><?= htmlspecialchars($repo['name']) ?></td>
                             <td><?= htmlspecialchars($repo['description']) ?></td>
+                            <td><?= htmlspecialchars($repo['language']) ?></td>
                             <td>
                                 <!-- Update Button triggers modal -->
                                 <button type="button" class="btn btn-warning btn-sm" data-toggle="modal"
@@ -192,6 +200,11 @@ try {
                                                             name="description" rows="3" required>
                                                             <?= htmlspecialchars($repo['description']) ?>
                                                         </textarea>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="language<?= $repo['repo_id'] ?>">Programming Language:</label>
+                                                        <input type="text" class="form-control" id="language<?= $repo['repo_id'] ?>"
+                                                            name="language" value="<?= htmlspecialchars($repo['language']) ?>" required>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
