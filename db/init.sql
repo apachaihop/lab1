@@ -308,3 +308,12 @@ INSERT INTO Reviews (review) VALUES
 ('Excellent work on the recent updates.'),
 ('Could use better error handling.');
 
+CREATE TABLE IF NOT EXISTS WeatherData (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    city VARCHAR(100) NOT NULL,
+    temperature DECIMAL(5,2) NOT NULL,
+    description VARCHAR(255) NOT NULL,
+    humidity DECIMAL(5,2) NOT NULL,
+    wind_speed DECIMAL(5,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
