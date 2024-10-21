@@ -12,8 +12,14 @@ try {
         $username = htmlspecialchars($_POST['username']);
         $email = htmlspecialchars($_POST['email']);
         $password = htmlspecialchars($_POST['password']);
+        if (empty($username) || empty($email) || empty($password)) {
+            throw new Exception("Username, email, and password cannot be empty or just spaces.");
+            $error = "Username, email, and password cannot be empty or just spaces.";
+        }
+        if (strpos($username, ' ') !== false || strpos($email, ' ') !== false || strpos($password, ' ') !== false) {
+            throw new Exception("Username, email, and password cannot contain spaces.");
+        }
 
-        // Валидация пароля
         $minLength = 8;
         $specialSymbols = ['!', '@', '#', '$', '%', '^', '&', '*'];
 
@@ -28,7 +34,6 @@ try {
         } elseif (strpbrk($password, implode('', $specialSymbols)) === false) {
             $error = "Password should contain at least one special symbol: " . implode(', ', $specialSymbols);
         } else {
-            // Проверяем наличие пользователя с таким же email или username
             $stmt = $conn->prepare("SELECT user_id FROM Users WHERE email = ? OR username = ?");
             $stmt->bind_param("ss", $email, $username);
             $stmt->execute();
@@ -37,7 +42,6 @@ try {
             if ($stmt->num_rows > 0) {
                 $error = "Email or username already exists. Please choose another.";
             } else {
-                // Хэшируем пароль
                 $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
                 // Вставляем нового пользователя в базу данных
@@ -57,7 +61,7 @@ try {
         }
     }
 } catch (Exception $e) {
-    $error = "Error while SQL connection processing";
+    $error = $e->getMessage();
 }
 
 closeConnection($conn);
