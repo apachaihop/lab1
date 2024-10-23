@@ -1,7 +1,11 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 include 'connection.php';
 include '../includes/header.php';
-session_start();
+include 'FileHandler.php';
 
 // Redirect to login if not authenticated
 if (!isset($_SESSION['user_id'])) {
@@ -17,21 +21,48 @@ try {
 
     // Handle Add Repository
     if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_repository'])) {
-        $name = htmlspecialchars(trim($_POST['name']));
-        $description = htmlspecialchars(trim($_POST['description']));
-        $language = htmlspecialchars(trim($_POST['language']));
+        try {
+            $conn->begin_transaction();
 
-        if (empty($name) || empty($description) || empty($language)) {
-            $error = "Both Name, Description, and Language are required.";
-        } else {
+            // Get and validate form data
+            $name = isset($_POST['name']) ? htmlspecialchars(trim($_POST['name'])) : null;
+            $description = isset($_POST['description']) ? htmlspecialchars(trim($_POST['description'])) : null;
+            $language = isset($_POST['language']) ? htmlspecialchars(trim($_POST['language'])) : null;
+
+            // Validate required fields
+            if (empty($name) || empty($description) || empty($language)) {
+                throw new Exception("Name, Description, and Language are required fields.");
+            }
+
+            // Insert repository
             $stmt = $conn->prepare("INSERT INTO Repositories (name, description, language, user_id) VALUES (?, ?, ?, ?)");
             $stmt->bind_param("sssi", $name, $description, $language, $user_id);
-            if ($stmt->execute()) {
-                $success = "Repository added successfully.";
-            } else {
-                $error = "Error adding repository: " . $stmt->error;
-            }
+            $stmt->execute();
+            $repoId = $stmt->insert_id;
             $stmt->close();
+
+            // Handle file uploads
+            $fileHandler = new FileHandler();
+            if (isset($_FILES['files'])) {
+                foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
+                    if ($_FILES['files']['error'][$key] === UPLOAD_ERR_OK) {
+                        $fileData = [
+                            'name' => $_FILES['files']['name'][$key],
+                            'type' => $_FILES['files']['type'][$key],
+                            'tmp_name' => $tmp_name,
+                            'error' => $_FILES['files']['error'][$key],
+                            'size' => $_FILES['files']['size'][$key]
+                        ];
+                        $fileHandler->saveRepoFile($conn, $repoId, $fileData);
+                    }
+                }
+            }
+
+            $conn->commit();
+            $success = "Repository created successfully.";
+        } catch (Exception $e) {
+            $conn->rollback();
+            $error = "Error: " . $e->getMessage();
         }
     }
 
@@ -121,22 +152,25 @@ try {
         <h3>Add New Repository</h3>
     </div>
     <div class="card-body">
-        <form method="post" action="my_repositories.php">
+        <form method="post" action="my_repositories.php" enctype="multipart/form-data">
             <input type="hidden" name="add_repository" value="1">
             <div class="form-group">
                 <label for="name">Repository Name:</label>
-                <input type="text" class="form-control" id="name" name="name" placeholder="Enter repository name" required>
+                <input type="text" class="form-control" id="name" name="name" required>
             </div>
             <div class="form-group">
-                <label for="description">Repository Description:</label>
-                <textarea class="form-control" id="description" name="description" rows="3"
-                    placeholder="Enter repository description" required></textarea>
+                <label for="description">Description:</label>
+                <textarea class="form-control" id="description" name="description" required></textarea>
             </div>
             <div class="form-group">
                 <label for="language">Programming Language:</label>
-                <input type="text" class="form-control" id="language" name="language" placeholder="e.g., Python, JavaScript" required>
+                <input type="text" class="form-control" id="language" name="language" required>
             </div>
-            <button type="submit" class="btn btn-primary">Add Repository</button>
+            <div class="form-group">
+                <label for="files">Repository Files:</label>
+                <input type="file" class="form-control-file" id="files" name="files[]" multiple>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Repository</button>
         </form>
     </div>
 </div>

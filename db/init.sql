@@ -21,6 +21,8 @@ CREATE TABLE Users (
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    avatar_data MEDIUMBLOB,
+    avatar_type VARCHAR(50),
     is_admin BOOLEAN DEFAULT FALSE
 );
 
@@ -185,6 +187,17 @@ CREATE TABLE RepositoryLikes (
     UNIQUE KEY unique_repo_like (user_id, repo_id)
 );
 
+-- Create RepositoryFiles Table
+CREATE TABLE RepositoryFiles (
+    file_id INT AUTO_INCREMENT PRIMARY KEY,
+    repo_id INT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_repo_file (repo_id, file_name)
+);
+
 -- -----------------------------------
 -- Insert Sample Data into Users Table
 -- -----------------------------------
@@ -222,6 +235,7 @@ INSERT INTO UserPreferences (user_id, language, view_count, like_count) VALUES
 (2, 'Java', 0, 0),
 (3, 'C#', 0, 0),
 (4, 'JavaScript', 0, 0);
+INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight) VALUES (0.33, 0.33, 0.34);
 -- -----------------------------------
 -- Insert Sample Data into RepositoryComments Table
 -- -----------------------------------
@@ -353,3 +367,4 @@ CREATE TABLE IF NOT EXISTS WeatherData (
     wind_speed DECIMAL(5,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+

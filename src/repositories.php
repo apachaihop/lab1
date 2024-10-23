@@ -162,6 +162,17 @@ try {
             $commentsStmt->execute();
             $commentsResult = $commentsStmt->get_result();
 
+            // Fetch repository files
+            $filesStmt = $conn->prepare("
+                SELECT file_name, file_path 
+                FROM RepositoryFiles 
+                WHERE repo_id = ?
+                ORDER BY file_name ASC
+            ");
+            $filesStmt->bind_param("i", $repo_id);
+            $filesStmt->execute();
+            $filesResult = $filesStmt->get_result();
+
             // Display repository details and comments
 ?>
             <div class="container mt-4">
@@ -246,6 +257,50 @@ try {
                 <?php else: ?>
                     <p><a href="/lab1/src/auth/login.php">Login</a> to add a comment.</p>
                 <?php endif; ?>
+
+                <h2 class="mt-4">Repository Files</h2>
+                <?php
+                $filesStmt = $conn->prepare("SELECT file_name FROM RepositoryFiles WHERE repo_id = ? ORDER BY file_name");
+                $filesStmt->bind_param("i", $repo['repo_id']);
+                $filesStmt->execute();
+                $filesResult = $filesStmt->get_result();
+
+                if ($filesResult->num_rows > 0): ?>
+                    <div class="list-group mb-4">
+                        <?php while ($file = $filesResult->fetch_assoc()): ?>
+                            <a href="#" class="list-group-item list-group-item-action file-preview-link"
+                                onclick="previewFile(<?= $repo['repo_id'] ?>, '<?= htmlspecialchars($file['file_name']) ?>'); return false;">
+                                <i class="fas fa-file me-2"></i>
+                                <?= htmlspecialchars($file['file_name']) ?>
+                            </a>
+                        <?php endwhile; ?>
+                    </div>
+
+                    <!-- File Preview Modal -->
+                    <div class="modal fade" id="filePreviewModal" tabindex="-1" role="dialog" aria-labelledby="filePreviewModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="filePreviewModalLabel">File Preview</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <pre><code id="fileContent" class="text-wrap"></code></pre>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <p>No files uploaded yet.</p>
+                <?php
+                endif;
+                $filesStmt->close();
+                ?>
             </div>
         <?php
             $commentsStmt->close();
@@ -376,8 +431,16 @@ try {
                 <?php foreach ($repositories as $repo): ?>
                     <div class="card mb-3">
                         <div class="card-body">
-                            <h5 class="card-title"><?= htmlspecialchars($repo['name']) ?></h5>
-                            <h6 class="card-subtitle mb-2 text-muted">By <?= htmlspecialchars($repo['username']) ?></h6>
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="display_avatar.php?user_id=<?= $repo['user_id'] ?>"
+                                    alt="<?= htmlspecialchars($repo['username']) ?>'s avatar"
+                                    class="rounded-circle mr-2"
+                                    style="width: 40px; height: 40px; object-fit: cover;">
+                                <div>
+                                    <h5 class="card-title mb-0"><?= htmlspecialchars($repo['name']) ?></h5>
+                                    <h6 class="card-subtitle text-muted">By <?= htmlspecialchars($repo['username']) ?></h6>
+                                </div>
+                            </div>
                             <p class="card-text"><?= htmlspecialchars($repo['description']) ?></p>
                             <p class="card-text"><small class="text-muted">Language: <?= htmlspecialchars($repo['language']) ?></small></p>
                             <p class="card-text"><small class="text-muted">Total Likes: <?= $repo['total_likes'] ?></small></p>
@@ -414,137 +477,36 @@ try {
 }
 ?>
 
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<link rel='stylesheet' href='https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css'>
-<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<!-- JavaScript Dependencies -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
 
+<!-- File Preview Script -->
 <script>
-    $(function() {
-        $("#search").autocomplete({
-            source: function(request, response) {
-                $.ajax({
-                    url: "autocomplete.php",
-                    dataType: "json",
-                    data: {
-                        term: request.term,
-                        field: $("#searchField").val()
-                    },
-                    success: function(data) {
-                        response(data);
-                    }
-                });
-            },
-            minLength: 2,
-        });
-    });
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Like repository
-        document.querySelectorAll('.like-repo-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const repoId = this.getAttribute('data-repo-id');
-                fetch('ajax_handlers.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `action=like_repo&repo_id=${repoId}`
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.classList.toggle('btn-outline-primary', !data.liked);
-                            this.classList.toggle('btn-primary', data.liked);
-                            this.innerHTML = data.liked ? '<i class="fas fa-thumbs-up"></i> Unlike' : '<i class="fas fa-thumbs-up"></i> Like';
-
-                            // Update UserPreferences for likes
-                            fetch('update_preferences.php', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: `action=update_like&repo_id=${repoId}&liked=${data.liked}`
-                            });
-                        }
-                    });
+    function previewFile(repoId, fileName) {
+        fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(content => {
+                document.getElementById('fileContent').textContent = content;
+                $('#filePreviewModal').modal('show');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error loading file: ' + error.message);
             });
-        });
+    }
 
-        // Subscribe to repository
-        document.querySelectorAll('.subscribe-repo-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const repoId = this.getAttribute('data-repo-id');
-                fetch('ajax_handlers.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `action=subscribe_repo&repo_id=${repoId}`
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.classList.toggle('btn-outline-secondary', !data.subscribed);
-                            this.classList.toggle('btn-secondary', data.subscribed);
-                            this.innerHTML = data.subscribed ? 'Unsubscribe' : 'Subscribe';
-                        }
-                    });
-            });
-        });
-
-        // Like comment
-        document.querySelectorAll('.like-comment-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const commentId = this.getAttribute('data-comment-id');
-                fetch('ajax_handlers.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `action=like_comment&comment_id=${commentId}`
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.classList.toggle('btn-outline-primary', !data.liked);
-                            this.classList.toggle('btn-primary', data.liked);
-                            this.innerHTML = data.liked ? '<i class="fas fa-thumbs-up"></i> Unlike' : '<i class="fas fa-thumbs-up"></i> Like';
-                            // Update like count
-                            const likeCountSpan = this.closest('.list-group-item').querySelector('.badge-primary');
-                            if (likeCountSpan) {
-                                const currentLikes = parseInt(likeCountSpan.textContent);
-                                likeCountSpan.textContent = data.liked ? currentLikes + 1 : currentLikes - 1;
-                            }
-                        }
-                    });
-            });
-        });
-
-        // Star comment
-        document.querySelectorAll('.star-comment-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const commentId = this.getAttribute('data-comment-id');
-                fetch('ajax_handlers.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: `action=star_comment&comment_id=${commentId}`
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            this.classList.toggle('btn-outline-warning', !data.starred);
-                            this.classList.toggle('btn-warning', data.starred);
-                            this.innerHTML = data.starred ? '<i class="fas fa-star"></i> Unstar' : '<i class="fas fa-star"></i> Star';
-                            // Update star count
-                            const starCountSpan = this.closest('.list-group-item').querySelector('.badge-warning');
-                            if (starCountSpan) {
-                                starCountSpan.textContent = data.starCount;
-                            }
-                        }
-                    });
-            });
+    // Add this to handle modal closing
+    $(document).ready(function() {
+        $('#filePreviewModal').on('hidden.bs.modal', function() {
+            document.getElementById('fileContent').textContent = '';
         });
     });
 </script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
