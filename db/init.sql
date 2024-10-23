@@ -222,6 +222,8 @@ INSERT INTO UserPreferences (user_id, language, view_count, like_count) VALUES
 (2, 'Java', 0, 0),
 (3, 'C#', 0, 0),
 (4, 'JavaScript', 0, 0);
+INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight) VALUES (0.33, 0.33, 0.34);
+
 -- -----------------------------------
 -- Insert Sample Data into RepositoryComments Table
 -- -----------------------------------
