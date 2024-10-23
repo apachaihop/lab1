@@ -1,4 +1,6 @@
--- Drop existing tables if they exist to ensure a clean setup
+create database lab1;
+use lab1;
+
 DROP TABLE IF EXISTS CommentLikes;
 DROP TABLE IF EXISTS RepositoryComments;
 DROP TABLE IF EXISTS PullRequestReviews;
@@ -13,7 +15,6 @@ DROP TABLE IF EXISTS Repositories;
 DROP TABLE IF EXISTS UserPreferences;
 DROP TABLE IF EXISTS Users;
 
--- Create Users Table
 CREATE TABLE Users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -23,7 +24,6 @@ CREATE TABLE Users (
     is_admin BOOLEAN DEFAULT FALSE
 );
 
--- Create Repositories Table with 'language' Column
 CREATE TABLE Repositories (
     repo_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -40,7 +40,6 @@ CREATE TABLE RepositoryComments (
     repo_id INT,
     user_id INT,
     comment TEXT NOT NULL,
-    stars INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
@@ -52,6 +51,7 @@ CREATE TABLE CommentLikes (
     comment_id INT,
     user_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_star BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (comment_id) REFERENCES RepositoryComments(comment_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
     UNIQUE KEY unique_like (comment_id, user_id)
@@ -150,20 +150,55 @@ CREATE TABLE Reviews(
 CREATE TABLE IF NOT EXISTS UserPreferences (
     user_id INT NOT NULL,
     language VARCHAR(50) NOT NULL,
-    preference_count INT DEFAULT 0,
+    view_count INT DEFAULT 0,
+    like_count INT DEFAULT 0,
     PRIMARY KEY (user_id, language),
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
+);
+
+-- Create UserPreferencesWeights Table
+CREATE TABLE UserPreferencesWeights (
+    weight_id INT AUTO_INCREMENT PRIMARY KEY,
+    view_weight FLOAT DEFAULT 0.33,
+    like_weight FLOAT DEFAULT 0.33,
+    subscription_weight FLOAT DEFAULT 0.34
+);
+
+-- Create RepositoryViews Table
+CREATE TABLE RepositoryViews (
+    view_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    repo_id INT,
+    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id),
+    FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id)
+);
+
+-- Create RepositoryLikes Table
+CREATE TABLE RepositoryLikes (
+    like_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    repo_id INT,
+    liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id),
+    FOREIGN KEY (repo_id) REFERENCES Repositories(repo_id),
+    UNIQUE KEY unique_repo_like (user_id, repo_id)
 );
 
 -- -----------------------------------
 -- Insert Sample Data into Users Table
 -- -----------------------------------
 
+-- Create Users Table
+-- ...
+
+-- Insert sample users with bcrypt hashed passwords
+-- Comments show the original unhashed passwords
 INSERT INTO Users (username, email, password_hash, is_admin) VALUES
-('alice', 'alice@example.com', SHA2('password123', 256), TRUE),
-('bob', 'bob@example.com', SHA2('securepass', 256), FALSE),
-('carol', 'carol@example.com', SHA2('mysecret', 256), FALSE),
-('dave', 'dave@example.com', SHA2('davepass', 256), FALSE);
+('alice', 'alice@example.com', '$2y$10$uKdJgT8DNIhNPnR.0FN3B.Q1J3uV4FmsoL1MYQ9.aqz5nPIKX5hKO', TRUE),   -- password: password123
+('bob', 'bob@example.com', '$2y$10$BV1GwtZD2qQ.4c.2qQDk9.5Vq.Qkd0zBLFa8.1xWf8tJcHZKvZBLe', FALSE),     -- password: securepass
+('carol', 'carol@example.com', '$2y$10$Xv4Ks1zNvHzGvYRQNjPOxe7.fugT8u2fPLKbkgq.Yz7tWVL.pEm9C', FALSE), -- password: mysecret
+('dave', 'dave@example.com', '$2y$10$q3vvJFO0M9S5jP5ZPwChC.mwPbEjBulRYf1cCfPNKf5.2.3aYh9su', FALSE);   -- password: davepass
 
 -- -----------------------------------
 -- Insert Sample Data into Repositories Table
@@ -181,32 +216,33 @@ INSERT INTO Repositories (user_id, name, description, language) VALUES
 
 -- -----------------------------------
 -- Insert Sample Data into UserPreferences Table
--- -----------------------------------
-
-INSERT INTO UserPreferences (user_id, language, preference_count) VALUES
-(2, 'Java', 5),
-(2, 'Go', 3),
-(3, 'C#', 4),
-(3, 'TypeScript', 2),
-(4, 'Ruby', 6),
-(4, 'Swift', 3),
-(1, 'Python', 10),
-(1, 'JavaScript', 7);
-
+-- -----------------------------------  
+INSERT INTO UserPreferences (user_id, language, view_count, like_count) VALUES
+(1, 'Python', 0, 0),
+(2, 'Java', 0, 0),
+(3, 'C#', 0, 0),
+(4, 'JavaScript', 0, 0);
 -- -----------------------------------
 -- Insert Sample Data into RepositoryComments Table
 -- -----------------------------------
 
-INSERT INTO RepositoryComments (repo_id, user_id, comment, stars) VALUES
-(1, 2, 'Great project! Really helped me learn Python.', 10),
-(1, 3, 'Needs better documentation.', 2),
-(2, 4, 'JavaScript tools are essential for web development.', 5),
-(3, 1, 'Impressive Java enterprise solutions.', 8),
-(4, 2, 'C# core functionalities are well implemented.', 4),
-(5, 3, 'Rails app is very user-friendly.', 6),
-(6, 1, 'Go concurrency patterns are powerful!', 7),
-(7, 4, 'TypeScript utilities make coding easier.', 3),
-(8, 2, 'Swift is perfect for mobile development.', 9);
+INSERT INTO RepositoryComments (repo_id, user_id, comment) VALUES
+(1, 2, 'Great project! Really helped me learn Python.'),
+(1, 3, 'Needs better documentation.'),
+(2, 4, 'JavaScript tools are essential for web development.'),
+(3, 1, 'Impressive Java enterprise solutions.'),
+(4, 2, 'C# core functionalities are well implemented.'),
+(5, 3, 'Rails app is very user-friendly.'),
+(6, 1, 'Go concurrency patterns are powerful!'),
+(7, 4, 'TypeScript utilities make coding easier.'),
+(8, 2, 'Swift is perfect for mobile development.');
+
+INSERT INTO CommentLikes (comment_id, user_id, is_star) VALUES
+(1, 2, TRUE),
+(2, 3, FALSE),
+(3, 4, FALSE),
+(4, 1, FALSE),
+(5, 2, FALSE);
 
 -- -----------------------------------
 -- Insert Sample Data into RepositorySubscriptions Table
