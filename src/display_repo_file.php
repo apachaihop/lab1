@@ -29,10 +29,8 @@ if (isset($_GET['repo_id']) && isset($_GET['file_name'])) {
         $fileHandler = new FileHandler();
         $fileContent = $fileHandler->getRepoFile($repoId . '/' . $fileName);
 
-        // Set content type based on file extension
-        $extension = pathinfo($fileName, PATHINFO_EXTENSION);
-        $mimeType = mime_content_type($fileHandler->repoFilesPath . $repoId . '/' . $fileName);
-        header("Content-Type: " . $mimeType);
+        // Update the content type header
+        header('Content-Type: text/plain; charset=UTF-8');
         echo $fileContent;
     } catch (Exception $e) {
         header("HTTP/1.0 500 Internal Server Error");

@@ -26,23 +26,26 @@ main {
 }
 
 .file-preview {
-    max-height: 500px;
-    overflow-y: auto;
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 4px;
-}
-
-#fileContent {
-    white-space: pre-wrap;
-    word-wrap: break-word;
     max-height: 70vh;
     overflow-y: auto;
     background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.file-preview pre {
+    margin: 0;
     padding: 1rem;
-    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
     line-height: 1.5;
+}
+
+#fileContent {
+    display: block;
+    overflow-x: auto;
+    background: none;
 }
 
 .list-group-item:hover {
@@ -104,7 +107,10 @@ main {
 }
 
 .modal-dialog.modal-lg {
-    max-width: 80%;
+    max-width: 95%;
+    width: 95%;
+    height: 95vh;
+    margin: 20px auto;
 }
 
 .file-preview-link {
@@ -113,4 +119,52 @@ main {
 
 .file-preview-link:hover {
     background-color: #f8f9fa;
+}
+
+.modal-dialog.modal-xl {
+    max-width: 90%;
+    width: 90%;
+    margin: 30px auto;
+}
+
+.modal-content {
+    height: 85vh;
+}
+
+.modal-body {
+    padding: 0;
+    overflow: hidden;
+}
+
+#fileContent {
+    margin: 0;
+    padding: 20px;
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    background-color: #f8f9fa;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre;
+    tab-size: 4;
+}
+
+/* Scrollbar styling */
+#fileContent::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+#fileContent::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#fileContent::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 6px;
+}
+
+#fileContent::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }

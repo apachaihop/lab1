@@ -317,7 +317,7 @@ try {
 
                     <!-- File Preview Modal -->
                     <div class="modal fade" id="filePreviewModal" tabindex="-1" role="dialog" aria-labelledby="filePreviewModalLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg">
+                        <div class="modal-dialog modal-xl">
                             <div class="modal-content">
                                 <div class="modal-header">
                                     <h5 class="modal-title" id="filePreviewModalLabel">File Preview</h5>
@@ -326,10 +326,7 @@ try {
                                     </button>
                                 </div>
                                 <div class="modal-body">
-                                    <pre><code id="fileContent" class="text-wrap"></code></pre>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                    <pre id="fileContent"></pre>
                                 </div>
                             </div>
                         </div>
@@ -551,7 +548,8 @@ try {
                 return response.text();
             })
             .then(content => {
-                document.getElementById('fileContent').textContent = content;
+                const preElement = document.getElementById('fileContent');
+                preElement.textContent = content;
                 $('#filePreviewModal').modal('show');
             })
             .catch(error => {
