@@ -4,35 +4,34 @@ include './src/connection.php';
 try {
     $conn = getConnection();
 
-    $user_id = $_SESSION['user_id'];
-    $stmt;
-    if ($_SESSION['is_admin']) {
-        $stmt = $conn->prepare("
-            SELECT 
-                (SELECT COUNT(*) FROM Repositories ) AS repoCount,
-                (SELECT COUNT(*) FROM Issues) AS issueCount,
-                (SELECT COUNT(*) FROM PullRequests ) AS prCount
-        ");
-    } else {
-        $stmt = $conn->prepare("
-            SELECT 
-            (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
-            (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
-                (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
-        ");
-        $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+    if (isset($_SESSION['user_id'])) {
+        $user_id = $_SESSION['user_id'];
+        $stmt;
+        if ($_SESSION['is_admin']) {
+            $stmt = $conn->prepare("
+                SELECT 
+                    (SELECT COUNT(*) FROM Repositories ) AS repoCount,
+                    (SELECT COUNT(*) FROM Issues) AS issueCount,
+                    (SELECT COUNT(*) FROM PullRequests ) AS prCount
+            ");
+        } else {
+            $stmt = $conn->prepare("
+                SELECT 
+                (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
+                (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
+                    (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
+            ");
+            $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+        }
+
+        $stmt->execute();
+        $result = $stmt->get_result()->fetch_assoc();
+
+        $repoCount = $result['repoCount'];
+        $issueCount = $result['issueCount'];
+        $prCount = $result['prCount'];
+        $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
     }
-
-
-
-    $stmt->execute();
-
-    $result = $stmt->get_result()->fetch_assoc();
-
-    $repoCount = $result['repoCount'];
-    $issueCount = $result['issueCount'];
-    $prCount = $result['prCount'];
-    $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
 
     closeConnection($conn);
 } catch (Exception $e) {
@@ -40,7 +39,6 @@ try {
     $repoCount = $issueCount = $prCount = $userCount = 0;
 }
 ?>
-
 
 <div class="container mt-4">
     <?php if (isset($_GET['success'])): ?>
@@ -62,6 +60,7 @@ try {
     <?php endif; ?>
 
     <?php if (isset($_SESSION['user_id'])): ?>
+        <!-- Existing authenticated user view -->
         <div class="card mb-4">
             <div class="card-header">
                 <h3>Your Profile</h3>
@@ -87,6 +86,7 @@ try {
                     <div class="col-md-9">
                         <h4>Statistics</h4>
                         <div class="row">
+                            <!-- Your existing cards code stays exactly the same -->
                             <!-- Repositories Card -->
                             <div class="col-md-3 d-flex">
                                 <div class="card text-white bg-primary mb-3 flex-fill d-flex flex-column">
@@ -145,53 +145,46 @@ try {
                 </div>
             </div>
         </div>
+    <?php else: ?>
+        <!-- Non-authenticated user view -->
+        <div class="jumbotron">
+            <h1 class="display-4">Welcome to VCS Project</h1>
+            <p class="lead">A powerful version control system for managing your code repositories.</p>
+            <hr class="my-4">
+            <p>Join our community to start managing your repositories, track issues, and collaborate with other developers.</p>
+            <div class="mt-4">
+                <a class="btn btn-primary btn-lg mr-3" href="/lab1/src/auth/register.php" role="button">Sign Up</a>
+                <a class="btn btn-outline-primary btn-lg" href="/lab1/src/auth/login.php" role="button">Login</a>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Repository Management</h5>
+                        <p class="card-text">Create and manage your code repositories with ease. Support for multiple programming languages.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Issue Tracking</h5>
+                        <p class="card-text">Keep track of bugs, feature requests, and tasks with our comprehensive issue tracking system.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Collaboration</h5>
+                        <p class="card-text">Work together with other developers through pull requests and code reviews.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     <?php endif; ?>
 </div>
 
-<h2>Submit a Review</h2>
-
-
-<form action="./src/submit_review.php" method="post">
-    <div class="form-group">
-        <div class="row">
-            <div class="col-md-6">
-                <label for="review">Review</label>
-            </div>
-            <div class="col-md-6 text-right">
-                <a href="./src/reviews.php">View Reviews</a>
-            </div>
-        </div>
-        <textarea class="form-control" id="review" name="review" rows="3" required></textarea>
-    </div>
-    <button type="submit" class="btn btn-primary">Submit</button>
-</form>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const avatarInput = document.getElementById('avatar');
-        if (avatarInput) {
-            avatarInput.addEventListener('change', function() {
-                if (this.files && this.files[0]) {
-                    const file = this.files[0];
-                    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-
-                    if (!allowedTypes.includes(file.type)) {
-                        alert('Only JPG, PNG and GIF files are allowed');
-                        this.value = '';
-                        return;
-                    }
-
-                    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                        alert('File size must be less than 5MB');
-                        this.value = '';
-                        return;
-                    }
-                }
-            });
-        }
-    });
-</script>
-
-<?php
-include './includes/footer.php';
-?>
+<?php include './includes/footer.php'; ?>
