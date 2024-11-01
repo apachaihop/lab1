@@ -368,3 +368,16 @@ CREATE TABLE IF NOT EXISTS WeatherData (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Run this SQL to ensure the weights table exists with default values
+CREATE TABLE IF NOT EXISTS UserPreferencesWeights (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    view_weight DECIMAL(10,2) DEFAULT 0.4,
+    like_weight DECIMAL(10,2) DEFAULT 0.4,
+    subscription_weight DECIMAL(10,2) DEFAULT 0.2
+);
+
+-- Insert default values if table is empty
+INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight)
+SELECT 0.4, 0.4, 0.2
+WHERE NOT EXISTS (SELECT 1 FROM UserPreferencesWeights);
+

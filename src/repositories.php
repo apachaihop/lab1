@@ -1,41 +1,74 @@
 <?php
-include 'connection.php';
-include '../includes/header.php';
+ob_start();
+require_once 'connection.php';
+require_once '../vendor/autoload.php';
+require_once 'cache_manager.php';
+require_once 'user_weight_calculator.php';
+
 session_start();
-include 'user_weight_calculator.php';
+
+use App\CacheManager;
 
 try {
     $conn = getConnection();
+    $cacheManager = new CacheManager($conn);
     $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
-    // Debug statement for user preferences
-    if ($user_id) {
-        $weightStmt = $conn->prepare("SELECT * FROM UserPreferencesWeights LIMIT 1");
-        $weightStmt->execute();
-        $weights = $weightStmt->get_result()->fetch_assoc();
-        $weightStmt->close();
-
-        $debugStmt = $conn->prepare("
-            SELECT language, view_count, like_count
-            FROM UserPreferences
-            WHERE user_id = ?
-        ");
-        $debugStmt->bind_param("i", $user_id);
-        $debugStmt->execute();
-        $debugResult = $debugStmt->get_result();
-
-        echo "<div class='alert alert-info'><h4>User Preferences:</h4><ul>";
-        while ($pref = $debugResult->fetch_assoc()) {
-            $calculatedWeights = calculateUserWeight($conn, $user_id, $weights, $pref['language']);
-            $baseWeight = $calculatedWeights[0];
-            $subscriptionWeight = $calculatedWeights[1];
-            $totalWeight = $baseWeight + $subscriptionWeight;
-            echo "<li>Language: {$pref['language']}, Views: {$pref['view_count']}, Likes: {$pref['like_count']}, Base Weight: {$baseWeight}, Subscription Weight: {$subscriptionWeight}, Total Weight: {$totalWeight}</li>";
-        }
-        echo "</ul></div>";
-        $debugStmt->close();
+    // Add this near the top of the file, before displaying any content
+    if (isset($_POST['clear_cache']) && $user_id) {
+        $cacheManager->clearCache($user_id);
+        // Clear the cache metadata cookie
+        setcookie('weights_cache_metadata', '', time() - 3600, '/');
+        // Redirect to prevent form resubmission
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
     }
 
+    // Get cached weights if user is logged in
+    $userWeightsData = null;
+    if ($user_id) {
+        try {
+            $userWeightsData = $cacheManager->getUserWeights($user_id);
+        } catch (\Exception $e) {
+            error_log("Error getting user weights: " . $e->getMessage());
+            $userWeightsData = ['weights' => [], 'isCached' => false];
+        }
+    }
+
+    // Now include the header
+    include '../includes/header.php';
+
+
+    if ($user_id) {
+        echo "<form method='post' class='mb-3'>
+            <button type='submit' name='clear_cache' class='btn btn-warning btn-sm'>
+                Clear Cache
+            </button>
+        </form>";
+    }
+
+    // Display user weights if available
+    if ($user_id && $userWeightsData && !empty($userWeightsData['weights'])) {
+        echo "<div class='alert alert-info'>
+            <h4>User Preferences (" . ($userWeightsData['isCached'] ? 'Cached' : 'Live') . "):</h4>
+            <ul>";
+
+        foreach ($userWeightsData['weights'] as $language => $weight) {
+            echo "<li>Language: {$language}, 
+                 Base Weight: {$weight['baseWeight']}, 
+                 Subscription Weight: {$weight['subscriptionWeight']}, 
+                 Total Weight: {$weight['totalWeight']}</li>";
+        }
+        echo "</ul>";
+
+        // Add cache status inside the preferences div
+        echo "<div class='mt-2'><small>Cache Status: " .
+            ($userWeightsData['isCached'] ? 'Cached' : 'Live') .
+            "</small></div>";
+        echo "</div>";
+    }
+
+    // Handle repository subscriptions
     if ($user_id && isset($_POST['subscribe_repo_id'])) {
         $repo_id = intval($_POST['subscribe_repo_id']);
 
@@ -68,6 +101,11 @@ try {
                 $subStmt->bind_param("ii", $repo_id, $user_id);
                 $subStmt->execute();
                 $subStmt->close();
+
+                // Clear the cache for this user
+                if ($cacheManager) {
+                    $cacheManager->clearCache($user_id);
+                }
             }
         }
 
@@ -75,7 +113,6 @@ try {
         header("Location: " . $_SERVER['PHP_SELF'] . (isset($_GET['repo_id']) ? "?repo_id=" . $_GET['repo_id'] : ""));
         exit();
     }
-
     // Handle comment submission
     if ($user_id && isset($_POST['comment']) && isset($_POST['repo_id'])) {
         $comment = htmlspecialchars(trim($_POST['comment']));
@@ -97,11 +134,11 @@ try {
 
         // Fetch repository details
         $repoStmt = $conn->prepare("
-            SELECT R.repo_id, R.name, R.description, R.language, R.created_at, U.username, R.user_id
-            FROM Repositories AS R
-            JOIN Users AS U ON R.user_id = U.user_id 
-            WHERE R.repo_id = ?
-        ");
+                SELECT R.repo_id, R.name, R.description, R.language, R.created_at, U.username, R.user_id
+                FROM Repositories AS R
+                JOIN Users AS U ON R.user_id = U.user_id 
+                WHERE R.repo_id = ?
+            ");
         $repoStmt->bind_param("i", $repo_id);
         $repoStmt->execute();
         $repoResult = $repoStmt->get_result();
@@ -115,9 +152,9 @@ try {
 
                 // Check if the user has already viewed this repository
                 $checkViewStmt = $conn->prepare("
-                    SELECT * FROM RepositoryViews 
-                    WHERE user_id = ? AND repo_id = ?
-                ");
+                        SELECT * FROM RepositoryViews 
+                        WHERE user_id = ? AND repo_id = ?
+                    ");
                 $checkViewStmt->bind_param("ii", $user_id, $repo_id);
                 $checkViewStmt->execute();
                 $checkViewResult = $checkViewStmt->get_result();
@@ -125,54 +162,57 @@ try {
                 if ($checkViewResult->num_rows == 0) {
                     // If it's a new view, insert into RepositoryViews
                     $insertViewStmt = $conn->prepare("
-                        INSERT INTO RepositoryViews (user_id, repo_id)
-                        VALUES (?, ?)
-                    ");
+                            INSERT INTO RepositoryViews (user_id, repo_id)
+                            VALUES (?, ?)
+                        ");
                     $insertViewStmt->bind_param("ii", $user_id, $repo_id);
                     $insertViewStmt->execute();
                     $insertViewStmt->close();
 
                     // Update UserPreferences
                     $updateViewStmt = $conn->prepare("
-                        INSERT INTO UserPreferences (user_id, language, view_count)
-                        VALUES (?, ?, 1)
-                        ON DUPLICATE KEY UPDATE view_count = view_count + 1
-                    ");
+                            INSERT INTO UserPreferences (user_id, language, view_count)
+                            VALUES (?, ?, 1)
+                            ON DUPLICATE KEY UPDATE view_count = view_count + 1
+                        ");
                     $updateViewStmt->bind_param("is", $user_id, $language);
                     $updateViewStmt->execute();
                     $updateViewStmt->close();
-                }
 
+                    // Clear the cache for this user after updating preferences
+                    if ($cacheManager) {
+                        $cacheManager->clearCache($user_id);
+                    }
+                }
                 $checkViewStmt->close();
             }
 
             // Fetch comments
             $commentsStmt = $conn->prepare("
-                SELECT RC.comment_id, RC.comment, RC.created_at, U.username,
-                       COALESCE(SUM(CASE WHEN CL.is_star = 1 THEN 1 ELSE 0 END), 0) as stars,
-                       COUNT(CL.like_id) as likes
-                FROM RepositoryComments RC
-                JOIN Users U ON RC.user_id = U.user_id
-                LEFT JOIN CommentLikes CL ON RC.comment_id = CL.comment_id
-                WHERE RC.repo_id = ?
-                GROUP BY RC.comment_id
-                ORDER BY RC.created_at DESC
-            ");
+                    SELECT RC.comment_id, RC.comment, RC.created_at, U.username,
+                           COALESCE(SUM(CASE WHEN CL.is_star = 1 THEN 1 ELSE 0 END), 0) as stars,
+                           COUNT(CL.like_id) as likes
+                    FROM RepositoryComments RC
+                    JOIN Users U ON RC.user_id = U.user_id
+                    LEFT JOIN CommentLikes CL ON RC.comment_id = CL.comment_id
+                    WHERE RC.repo_id = ?
+                    GROUP BY RC.comment_id
+                    ORDER BY RC.created_at DESC
+                ");
             $commentsStmt->bind_param("i", $repo_id);
             $commentsStmt->execute();
             $commentsResult = $commentsStmt->get_result();
 
             // Fetch repository files
             $filesStmt = $conn->prepare("
-                SELECT file_name, file_path 
-                FROM RepositoryFiles 
-                WHERE repo_id = ?
-                ORDER BY file_name ASC
-            ");
+                    SELECT file_name, file_path 
+                    FROM RepositoryFiles 
+                    WHERE repo_id = ?
+                    ORDER BY file_name ASC
+                ");
             $filesStmt->bind_param("i", $repo_id);
             $filesStmt->execute();
             $filesResult = $filesStmt->get_result();
-
             // Display repository details and comments
 ?>
             <div class="container mt-4">
@@ -257,7 +297,6 @@ try {
                 <?php else: ?>
                     <p><a href="/lab1/src/auth/login.php">Login</a> to add a comment.</p>
                 <?php endif; ?>
-
                 <h2 class="mt-4">Repository Files</h2>
                 <?php
                 $filesStmt = $conn->prepare("SELECT file_name FROM RepositoryFiles WHERE repo_id = ? ORDER BY file_name");
@@ -346,7 +385,6 @@ try {
             FROM Repositories AS R 
             JOIN Users AS U ON R.user_id = U.user_id
         ";
-
         $params = [
             $user_id,
             $weights['view_weight'],
@@ -394,14 +432,7 @@ try {
         while ($row = $result->fetch_assoc()) {
             $repositories[] = $row;
         }
-
-        // Remove this sorting
-        // usort($repositories, function ($a, $b) {
-        //     return $b['user_preference'] - $a['user_preference'];
-        // });
-
         ?>
-
         <div class="container mt-4">
             <h1>Repositories</h1>
             <form method="get" class="mb-3">
@@ -466,9 +497,10 @@ try {
 
             <?php $stmt->close(); ?>
         </div>
-
 <?php
     }
+    // Add the cache status indicator at the bottom
+    echo "<div id='cacheStatusIndicator' class='position-fixed bottom-0 end-0 p-3'></div>";
 
     closeConnection($conn);
     include '../includes/footer.php';
@@ -481,9 +513,35 @@ try {
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
-<!-- File Preview Script -->
+<!-- Cache Status and File Preview Scripts -->
 <script>
+    function displayCacheStatus() {
+        const cacheMetadata = getCookie('weights_cache_metadata');
+        if (cacheMetadata) {
+            try {
+                const data = JSON.parse(cacheMetadata);
+                console.log('Cache Status:', data);
+
+                const indicator = document.getElementById('cacheStatusIndicator');
+                if (indicator) {
+                    indicator.innerHTML = `
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>Cache Status:</strong> ${data.status}<br>
+                                    ${data.cached_at ? `<strong>Cached at:</strong> ${data.cached_at}<br>` : ''}
+                                    ${data.expires_in_minutes ? `<strong>Expires in:</strong> ${data.expires_in_minutes} minutes` : ''}
+                                </small>
+                            </div>
+                        `;
+                }
+            } catch (e) {
+                console.error('Error parsing cache metadata:', e);
+            }
+        }
+    }
+
     function previewFile(repoId, fileName) {
         fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
             .then(response => {
@@ -502,11 +560,50 @@ try {
             });
     }
 
-    // Add this to handle modal closing
-    $(document).ready(function() {
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+    }
+
+    // Initialize everything when the document is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        displayCacheStatus();
+
+        // Modal handling
         $('#filePreviewModal').on('hidden.bs.modal', function() {
             document.getElementById('fileContent').textContent = '';
         });
+
+        // Handle repository subscription buttons
+        $('.subscribe-repo-btn').click(function() {
+            const repoId = $(this).data('repo-id');
+            const form = $('<form method="post"></form>');
+            form.append(`<input type="hidden" name="subscribe_repo_id" value="${repoId}">`);
+            $('body').append(form);
+            form.submit();
+        });
     });
+
+    // Update cache status every minute
+    setInterval(displayCacheStatus, 60000);
 </script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<style>
+    #cacheStatusIndicator {
+        z-index: 1000;
+        opacity: 0.9;
+    }
+
+    #cacheStatusIndicator:hover {
+        opacity: 1;
+    }
+
+    .file-preview-link {
+        cursor: pointer;
+    }
+
+    .file-preview-link:hover {
+        background-color: #f8f9fa;
+    }
+</style>
