@@ -40,6 +40,14 @@ try {
         if (password_verify($password, $hashed_password)) {
             $_SESSION['user_id'] = $user_id;
             $_SESSION['is_admin'] = $is_admin;
+
+            // Handle remember me functionality
+            if (isset($_POST['remember']) && $_POST['remember'] == 'on') {
+                // Set cookies that expire in 30 days
+                setcookie('user_id', $user_id, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                setcookie('is_admin', $is_admin, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+            }
+
             header("Location: /lab1/index.php");
             exit();
         } else {
@@ -85,6 +93,10 @@ try {
             <div class="form-group">
                 <label for="password">Password:</label>
                 <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <div class="form-group form-check">
+                <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                <label class="form-check-label" for="remember">Remember Me</label>
             </div>
             <button type="submit" class="btn btn-primary">Login</button>
         </form>
