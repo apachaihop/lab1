@@ -1,10 +1,27 @@
 <?php
 session_start();
+include '../connection.php';
 
-// Clear cookies if they exist
-if (isset($_COOKIE['user_id'])) {
-    setcookie('user_id', '', time() - 3600, '/');
-    setcookie('is_admin', '', time() - 3600, '/');
+// Clear remember me token if it exists
+if (isset($_COOKIE['remember_me'])) {
+    try {
+        $conn = getConnection();
+        list($selector,) = explode(':', $_COOKIE['remember_me']);
+
+        // Delete token from database
+        $stmt = $conn->prepare("DELETE FROM RememberMeTokens WHERE selector = ?");
+        $stmt->bind_param("s", $selector);
+        $stmt->execute();
+
+        // Clear the cookie
+        setcookie('remember_me', '', time() - 3600, '/', '', true, true);
+    } catch (Exception $e) {
+        // Log error if needed
+    } finally {
+        if (isset($conn)) {
+            closeConnection($conn);
+        }
+    }
 }
 
 session_unset();

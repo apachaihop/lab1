@@ -1,5 +1,5 @@
-create database lab1;
-use lab1;
+create database lab6;
+use lab6;
 
 DROP TABLE IF EXISTS CommentLikes;
 DROP TABLE IF EXISTS RepositoryComments;
@@ -13,7 +13,9 @@ DROP TABLE IF EXISTS Branches;
 DROP TABLE IF EXISTS RepositorySubscriptions;
 DROP TABLE IF EXISTS Repositories;
 DROP TABLE IF EXISTS UserPreferences;
+DROP TABLE IF EXISTS UserWeightHistory;
 DROP TABLE IF EXISTS Users;
+
 
 CREATE TABLE Users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -24,6 +26,14 @@ CREATE TABLE Users (
     avatar_data MEDIUMBLOB,
     avatar_type VARCHAR(50),
     is_admin BOOLEAN DEFAULT FALSE
+);
+CREATE TABLE RememberMeTokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    selector VARCHAR(255) NOT NULL,
+    token VARCHAR(255) NOT NULL,
+    expires DATETIME NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
 );
 
 CREATE TABLE Repositories (
@@ -367,17 +377,4 @@ CREATE TABLE IF NOT EXISTS WeatherData (
     wind_speed DECIMAL(5,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Run this SQL to ensure the weights table exists with default values
-CREATE TABLE IF NOT EXISTS UserPreferencesWeights (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    view_weight DECIMAL(10,2) DEFAULT 0.4,
-    like_weight DECIMAL(10,2) DEFAULT 0.4,
-    subscription_weight DECIMAL(10,2) DEFAULT 0.2
-);
-
--- Insert default values if table is empty
-INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight)
-SELECT 0.4, 0.4, 0.2
-WHERE NOT EXISTS (SELECT 1 FROM UserPreferencesWeights);
 

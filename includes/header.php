@@ -1,10 +1,68 @@
 <?php
 session_start();
 
-// Check for remember me cookies if not logged in
-if (!isset($_SESSION['user_id']) && isset($_COOKIE['user_id'])) {
-    $_SESSION['user_id'] = $_COOKIE['user_id'];
-    $_SESSION['is_admin'] = $_COOKIE['is_admin'];
+// Check for remember me token if not logged in
+if (!isset($_SESSION['user_id']) && isset($_COOKIE['remember_me'])) {
+    $connectionPath = '';
+    if (strpos($_SERVER['SCRIPT_NAME'], '/src/') !== false) {
+        $connectionPath = '../connection.php';
+    } else if (strpos($_SERVER['SCRIPT_NAME'], '/src/admin/') !== false) {
+        $connectionPath = '../../connection.php';
+    } else {
+        $connectionPath = './src/connection.php';
+    }
+
+    require_once $connectionPath;
+
+    try {
+        $conn = getConnection();
+
+        // Basic cookie validation
+        if (empty($_COOKIE['remember_me']) || strpos($_COOKIE['remember_me'], ':') === false) {
+            setcookie('remember_me', '', time() - 3600, '/', '', true, true);
+            return;
+        }
+
+        list($selector, $validator) = explode(':', $_COOKIE['remember_me']);
+
+        // Check for valid token
+        $stmt = $conn->prepare("SELECT t.token, t.user_id, u.is_admin 
+            FROM RememberMeTokens t 
+            JOIN Users u ON t.user_id = u.user_id 
+            WHERE t.selector = ? AND t.expires > NOW()");
+
+        if (!$stmt) {
+            throw new Exception('Failed to prepare statement');
+        }
+
+        $stmt->bind_param("s", $selector);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($row && hash_equals($row['token'], hash('sha256', $validator))) {
+            session_regenerate_id(true);
+            $_SESSION['user_id'] = $row['user_id'];
+            $_SESSION['is_admin'] = $row['is_admin'];
+        } else {
+            // Invalid token - remove cookie
+            setcookie('remember_me', '', time() - 3600, '/', '', true, true);
+        }
+    } catch (Exception $e) {
+        error_log('Remember Me Error: ' . $e->getMessage());
+        setcookie('remember_me', '', time() - 3600, '/', '', true, true);
+    } finally {
+        if (isset($conn)) {
+            closeConnection($conn);
+        }
+    }
+}
+
+// Ensure session variables are set
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['user_id'] = null;
+    $_SESSION['is_admin'] = null;
 }
 ?>
 <!DOCTYPE html>

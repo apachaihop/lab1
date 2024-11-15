@@ -1,42 +1,49 @@
 <?php
-include './includes/header.php';
-include './src/connection.php';
+// Initialize variables
+$repoCount = $issueCount = $prCount = $userCount = 0;
+
 try {
-    $conn = getConnection();
+    include './includes/header.php';
+    include './src/connection.php';
 
     if (isset($_SESSION['user_id'])) {
+        $conn = getConnection();
         $user_id = $_SESSION['user_id'];
-        $stmt;
-        if ($_SESSION['is_admin']) {
-            $stmt = $conn->prepare("
-                SELECT 
-                    (SELECT COUNT(*) FROM Repositories ) AS repoCount,
-                    (SELECT COUNT(*) FROM Issues) AS issueCount,
-                    (SELECT COUNT(*) FROM PullRequests ) AS prCount
-            ");
-        } else {
-            $stmt = $conn->prepare("
-                SELECT 
-                (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
-                (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
-                    (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
-            ");
-            $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+
+        try {
+            if ($_SESSION['is_admin']) {
+                $stmt = $conn->prepare("
+                    SELECT 
+                        (SELECT COUNT(*) FROM Repositories) AS repoCount,
+                        (SELECT COUNT(*) FROM Issues) AS issueCount,
+                        (SELECT COUNT(*) FROM PullRequests) AS prCount
+                ");
+            } else {
+                $stmt = $conn->prepare("
+                    SELECT 
+                        (SELECT COUNT(*) FROM Repositories WHERE user_id = ?) AS repoCount,
+                        (SELECT COUNT(*) FROM Issues WHERE user_id = ?) AS issueCount,
+                        (SELECT COUNT(*) FROM PullRequests WHERE user_id = ?) AS prCount
+                ");
+                $stmt->bind_param("iii", $user_id, $user_id, $user_id);
+            }
+
+            $stmt->execute();
+            $result = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            $repoCount = $result['repoCount'];
+            $issueCount = $result['issueCount'];
+            $prCount = $result['prCount'];
+
+            $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
+        } finally {
+            closeConnection($conn);
         }
-
-        $stmt->execute();
-        $result = $stmt->get_result()->fetch_assoc();
-
-        $repoCount = $result['repoCount'];
-        $issueCount = $result['issueCount'];
-        $prCount = $result['prCount'];
-        $userCount = $conn->query("SELECT COUNT(*) AS count FROM Users")->fetch_assoc()['count'];
     }
-
-    closeConnection($conn);
 } catch (Exception $e) {
-    $error = "Error: Sql connection refused";
-    $repoCount = $issueCount = $prCount = $userCount = 0;
+    error_log("Index Error: " . $e->getMessage());
+    $error = "An error occurred. Please try again later.";
 }
 ?>
 

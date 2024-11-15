@@ -41,20 +41,43 @@ try {
             $_SESSION['user_id'] = $user_id;
             $_SESSION['is_admin'] = $is_admin;
 
+            // Close the authentication statement before handling remember me
+            $stmt->close();
+
             // Handle remember me functionality
             if (isset($_POST['remember']) && $_POST['remember'] == 'on') {
-                // Set cookies that expire in 30 days
-                setcookie('user_id', $user_id, time() + (30 * 24 * 60 * 60), '/', '', true, true);
-                setcookie('is_admin', $is_admin, time() + (30 * 24 * 60 * 60), '/', '', true, true);
+                // Generate a secure random token
+                $selector = bin2hex(random_bytes(16));
+                $validator = bin2hex(random_bytes(32));
+                $token_hash = hash('sha256', $validator);
+
+                // Set expiry date
+                $expiry = date('Y-m-d H:i:s', time() + (30 * 24 * 60 * 60));
+
+                // Store token in database
+                $remember_stmt = $conn->prepare("INSERT INTO RememberMeTokens (user_id, selector, token, expires) VALUES (?, ?, ?, ?)");
+                $remember_stmt->bind_param("isss", $user_id, $selector, $token_hash, $expiry);
+                $remember_stmt->execute();
+                $remember_stmt->close();
+
+                // Set cookie with selector:validator
+                setcookie(
+                    'remember_me',
+                    $selector . ':' . $validator,
+                    time() + (30 * 24 * 60 * 60),
+                    '/',
+                    '',
+                    true,    // secure flag
+                    true     // httponly flag
+                );
             }
 
             header("Location: /lab1/index.php");
             exit();
         } else {
             $error = "Invalid username or password";
+            $stmt->close();
         }
-
-        $stmt->close();
     }
 } catch (Exception $e) {
     $error = "Error while SQL connection processing: " . $e->getMessage();
