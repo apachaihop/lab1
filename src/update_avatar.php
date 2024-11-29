@@ -14,11 +14,13 @@ try {
 
     if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
         $fileHandler->saveAvatar($conn, $_SESSION['user_id'], $_FILES['avatar']);
-        header("Location: /lab1/index.php?success=Avatar updated successfully");
+        $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Avatar updated successfully'];
+        header("Location: /lab1/index.php");
     } else {
         throw new Exception("No file uploaded or error in upload");
     }
 } catch (Exception $e) {
-    header("Location: /lab1/index.php?error=" . urlencode($e->getMessage()));
+    $_SESSION['flash_message'] = ['type' => 'error', 'message' => $e->getMessage()];
+    header("Location: /lab1/index.php");
 }
 exit();

@@ -41,22 +41,14 @@ try {
 ?>
 
 <div class="container mt-4">
-    <?php if (isset($_GET['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?= htmlspecialchars($_GET['success']) ?>
+    <?php if (isset($_SESSION['flash_message'])): ?>
+        <div class="alert alert-<?= $_SESSION['flash_message']['type'] === 'success' ? 'success' : 'danger' ?> alert-dismissible fade show" role="alert">
+            <?= htmlspecialchars($_SESSION['flash_message']['message']) ?>
             <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                 <span aria-hidden="true">&times;</span>
             </button>
         </div>
-    <?php endif; ?>
-
-    <?php if (isset($_GET['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?= htmlspecialchars($_GET['error']) ?>
-            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
+        <?php unset($_SESSION['flash_message']); ?>
     <?php endif; ?>
 
     <?php if (isset($_SESSION['user_id'])): ?>
@@ -69,6 +61,7 @@ try {
                 <div class="row">
                     <div class="col-md-3 text-center">
                         <img src="src/display_avatar.php?user_id=<?= $_SESSION['user_id'] ?>"
+                            onerror="if (this.src != 'assets/images/default-avatar.png') this.src='assets/images/default-avatar.png';"
                             alt="Your avatar"
                             class="rounded-circle mb-3"
                             style="width: 150px; height: 150px; object-fit: cover;">

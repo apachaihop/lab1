@@ -23,14 +23,21 @@ try {
             throw new Exception("The sum of weights must be equal to 1.");
         }
 
-        $stmt = $conn->prepare("
-            INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight) 
-            VALUES (?, ?, ?) 
-            ON DUPLICATE KEY UPDATE 
-                view_weight = VALUES(view_weight), 
-                like_weight = VALUES(like_weight), 
-                subscription_weight = VALUES(subscription_weight)
-        ");
+        // First, check if any weights exist
+        $checkStmt = $conn->prepare("SELECT COUNT(*) as count FROM UserPreferencesWeights");
+        $checkStmt->execute();
+        $result = $checkStmt->get_result();
+        $row = $result->fetch_assoc();
+        $checkStmt->close();
+
+        if ($row['count'] == 0) {
+            // If no weights exist, do a simple INSERT
+            $stmt = $conn->prepare("INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight) VALUES (?, ?, ?)");
+        } else {
+            // If weights exist, do an UPDATE
+            $stmt = $conn->prepare("UPDATE UserPreferencesWeights SET view_weight = ?, like_weight = ?, subscription_weight = ?");
+        }
+
         $stmt->bind_param("ddd", $view_weight, $like_weight, $subscription_weight);
         $stmt->execute();
         $stmt->close();
@@ -38,10 +45,20 @@ try {
         $success = "Weights updated successfully.";
     }
 
+    // When fetching weights, handle case where no weights exist
     $stmt = $conn->prepare("SELECT * FROM UserPreferencesWeights LIMIT 1");
     $stmt->execute();
     $result = $stmt->get_result();
     $weights = $result->fetch_assoc();
+
+    if (!$weights) {
+        // Set default weights if none exist
+        $weights = [
+            'view_weight' => 0.33,
+            'like_weight' => 0.33,
+            'subscription_weight' => 0.34
+        ];
+    }
     $stmt->close();
 
     closeConnection($conn);

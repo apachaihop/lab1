@@ -30,6 +30,10 @@ class FileHandler
         }
 
         $avatarData = file_get_contents($file['tmp_name']);
+        if (!@getimagesizefromstring($avatarData)) {
+            throw new Exception("Invalid image file. The file appears to be corrupted.");
+        }
+
         $stmt = $conn->prepare("UPDATE Users SET avatar_data = ?, avatar_type = ? WHERE user_id = ?");
         $stmt->bind_param("ssi", $avatarData, $file['type'], $userId);
         $success = $stmt->execute();
@@ -43,6 +47,12 @@ class FileHandler
         try {
             error_log("Starting saveRepoFile for repoId: " . $repoId);
             error_log("File data: " . print_r($file, true));
+
+            $maxFileSize = 50 * 1024 * 1024;
+            if ($file['size'] > $maxFileSize) {
+                error_log("File size exceeds limit: " . $file['size'] . " bytes");
+                throw new Exception("File size exceeds maximum limit of 50MB");
+            }
 
             if ($file['error'] !== UPLOAD_ERR_OK) {
                 $errorMessages = [

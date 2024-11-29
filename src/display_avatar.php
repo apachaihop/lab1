@@ -14,16 +14,21 @@ if (isset($_GET['user_id'])) {
         $user = $result->fetch_assoc();
         $stmt->close();
 
+        // Check if user exists and has avatar data
         if ($user && $user['avatar_data']) {
-            header("Content-Type: " . $user['avatar_type']);
-            echo $user['avatar_data'];
-        } else {
-            // Return default avatar
-            header("Content-Type: image/png");
-            echo file_get_contents(__DIR__ . '/../assets/default_avatar.png');
+            // Validate image data
+            if (@getimagesizefromstring($user['avatar_data'])) {
+                header("Content-Type: " . $user['avatar_type']);
+                echo $user['avatar_data'];
+                exit;
+            }
         }
+
+        // If we get here, either no avatar or invalid image data
+        header("Content-Type: image/png");
+        echo file_get_contents(__DIR__ . '/../assets/default_avatar.png');
     } catch (Exception $e) {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo "Error: " . $e->getMessage();
+        header("Content-Type: image/png");
+        echo file_get_contents(__DIR__ . '/../assets/default_avatar.png');
     }
 }
