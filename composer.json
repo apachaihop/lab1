@@ -18,7 +18,10 @@
     },
     "require-dev": {
         "symfony/profiler-pack": "^1.0",
-        "phpstan/phpstan": "^1.10"
+        "phpstan/phpstan": "^1.10",
+        "phpunit/phpunit": "^9.0",
+        "php-webdriver/webdriver": "^1.12"
+        
     },
     "scripts": {
         "analyze": "phpstan analyze src --level=5",
@@ -26,7 +29,10 @@
         "optimize": [
             "composer dump-autoload --optimize",
             "php -d opcache.enable_cli=1 -d opcache.jit_buffer_size=100M"
-        ]
+        ],
+        "test": "phpunit tests",
+        "test:functional": "phpunit tests/FunctionalTest.php",
+        "test:ui": "phpunit tests/UITest.php"
     },
     "config": {
         "sort-packages": true,

@@ -23,7 +23,7 @@ class CacheManager
     {
         $this->cache = new FilesystemAdapter();
         $this->logger = new Logger('cache');
-        $this->logger->pushHandler(new StreamHandler(__DIR__ . '/repository_files/cache.log', Logger::DEBUG));
+        $this->logger->pushHandler(new StreamHandler(dirname(__DIR__) . '/public/cache.log', Logger::DEBUG));
         $this->conn = $conn;
         $this->cacheDuration = $cacheDuration;
         $this->profiler = $profiler;
