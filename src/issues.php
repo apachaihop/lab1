@@ -12,18 +12,18 @@ try {
     $user_id = $_SESSION['user_id'];
 
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
-        $title = htmlspecialchars($_POST['title']);
-        $description = htmlspecialchars($_POST['description']);
-        $status = htmlspecialchars($_POST['status']);
+        $title = $_POST['title'];
+        $description = $_POST['description'];
+        $status = $_POST['status'];
 
         $stmt = $conn->prepare("INSERT INTO Issues (title, description, status, user_id) VALUES (?, ?, ?, ?)");
         if ($stmt === false) {
-            die('Prepare failed: ' . htmlspecialchars($conn->error));
+            die('Prepare failed: ' . $conn->error);
         }
 
         $stmt->bind_param("sssi", $title, $description, $status, $user_id);
         if ($stmt->execute() === false) {
-            die('Execute failed: ' . htmlspecialchars($stmt->error));
+            die('Execute failed: ' . $stmt->error);
         }
 
         $stmt->close();
@@ -67,7 +67,7 @@ try {
 }
 
 echo "<h1>My Issues</h1>";
-if(isset($error)) {
+if (isset($error)) {
     echo "<div class='alert alert-danger'> $error</div>";
 }
 
@@ -123,36 +123,36 @@ if ($result->num_rows > 0) {
             <tbody>";
     while ($row = $result->fetch_assoc()) {
         echo "<tr>
-                <td>" . htmlspecialchars($row["title"]) . "</td>
-                <td>" . htmlspecialchars($row["description"]) . "</td>
-                <td>" . htmlspecialchars($row["status"]) . "</td>
+                <td>" . $row["title"] . "</td>
+                <td>" . $row["description"] . "</td>
+                <td>" . $row["status"] . "</td>
                 <td>
                     <form method='post' action='delete_issue.php' style='display:inline;'>
-                        <input type='hidden' name='issue_id' value='" . htmlspecialchars($row["issue_id"]) . "'>
+                        <input type='hidden' name='issue_id' value='" . $row["issue_id"] . "'>
                         <button type='submit' class='btn btn-danger'>Delete</button>
                     </form>
-                    <button type='button' class='btn btn-warning' data-toggle='modal' data-target='#updateModal" . htmlspecialchars($row["issue_id"]) . "'>Update</button>
+                    <button type='button' class='btn btn-warning' data-toggle='modal' data-target='#updateModal" . $row["issue_id"] . "'>Update</button>
                     
                     <!-- Update Modal -->
-                    <div class='modal fade' id='updateModal" . htmlspecialchars($row["issue_id"]) . "' tabindex='-1' role='dialog' aria-labelledby='updateModalLabel" . htmlspecialchars($row["issue_id"]) . "' aria-hidden='true'>
+                    <div class='modal fade' id='updateModal" . $row["issue_id"] . "' tabindex='-1' role='dialog' aria-labelledby='updateModalLabel" . $row["issue_id"] . "' aria-hidden='true'>
                         <div class='modal-dialog' role='document'>
                             <div class='modal-content'>
                                 <div class='modal-header'>
-                                    <h5 class='modal-title' id='updateModalLabel" . htmlspecialchars($row["issue_id"]) . "'>Update Issue</h5>
+                                    <h5 class='modal-title' id='updateModalLabel" . $row["issue_id"] . "'>Update Issue</h5>
                                     <button type='button' class='close' data-dismiss='modal' aria-label='Close'>
                                         <span aria-hidden='true'>&times;</span>
                                     </button>
                                 </div>
                                 <div class='modal-body'>
                                     <form method='post' action='update_issue.php'>
-                                        <input type='hidden' name='issue_id' value='" . htmlspecialchars($row["issue_id"]) . "'>
+                                        <input type='hidden' name='issue_id' value='" . $row["issue_id"] . "'>
                                         <div class='form-group'>
                                             <label for='title'>Title:</label>
-                                            <input type='text' class='form-control' id='title' name='title' value='" . htmlspecialchars($row["title"]) . "' required>
+                                            <input type='text' class='form-control' id='title' name='title' value='" . $row["title"] . "' required>
                                         </div>
                                         <div class='form-group'>
                                             <label for='description'>Description:</label>
-                                            <input type='text' class='form-control' id='description' name='description' value='" . htmlspecialchars($row["description"]) . "' required>
+                                            <input type='text' class='form-control' id='description' name='description' value='" . $row["description"] . "' required>
                                         </div>
                                         <div class='form-group'>
                                             <label for='status'>Status:</label>
@@ -178,4 +178,3 @@ if ($result->num_rows > 0) {
 $stmt->close();
 closeConnection($conn);
 include '../includes/footer.php';
-?>
