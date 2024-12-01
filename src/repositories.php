@@ -365,16 +365,16 @@ try {
         if (isset($_GET['sort'])) {
             switch ($_GET['sort']) {
                 case 'language':
-                    $sql .= " ORDER BY R.language ASC, user_preference DESC, total_likes DESC";
+                    $sql .= " ORDER BY R.language ASC, user_preference DESC";
                     break;
                 case 'likes':
-                    $sql .= " ORDER BY total_likes DESC, user_preference DESC";
+                    $sql .= " ORDER BY  user_preference DESC";
                     break;
                 default:
-                    $sql .= " ORDER BY user_preference DESC, total_likes DESC, R.created_at DESC";
+                    $sql .= " ORDER BY user_preference DESC, R.created_at DESC";
             }
         } else {
-            $sql .= " ORDER BY user_preference DESC, total_likes DESC, R.created_at DESC";
+            $sql .= " ORDER BY user_preference DESC, R.created_at DESC";
         }
 
         $stmt = $conn->prepare($sql);

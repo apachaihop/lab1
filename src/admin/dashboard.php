@@ -19,9 +19,7 @@ try {
 
         // Ensure weights sum up to 1
         $total_weight = $view_weight + $like_weight + $subscription_weight;
-        if (abs($total_weight - 1) > 0.0001) {
-            throw new Exception("The sum of weights must be equal to 1.");
-        }
+
 
         // First, check if any weights exist
         $checkStmt = $conn->prepare("SELECT COUNT(*) as count FROM UserPreferencesWeights");

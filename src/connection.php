@@ -3,7 +3,7 @@
 $servername = "localhost";
 $username = "root";
 $password = "";
-$dbname = "lab1";
+$dbname = "lab5";
 
 function getConnection()
 {

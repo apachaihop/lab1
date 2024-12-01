@@ -48,10 +48,10 @@ class FileHandler
             error_log("Starting saveRepoFile for repoId: " . $repoId);
             error_log("File data: " . print_r($file, true));
 
-            $maxFileSize = 50 * 1024 * 1024;
+            $maxFileSize = 1 * 1024 * 1024;
             if ($file['size'] > $maxFileSize) {
                 error_log("File size exceeds limit: " . $file['size'] . " bytes");
-                throw new Exception("File size exceeds maximum limit of 50MB");
+                throw new Exception("File size exceeds maximum limit of 1MB");
             }
 
             if ($file['error'] !== UPLOAD_ERR_OK) {
