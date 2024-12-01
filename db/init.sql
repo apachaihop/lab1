@@ -240,11 +240,6 @@ INSERT INTO Repositories (user_id, name, description, language) VALUES
 -- -----------------------------------
 -- Insert Sample Data into UserPreferences Table
 -- -----------------------------------  
-INSERT INTO UserPreferences (user_id, language, view_count, like_count) VALUES
-(1, 'Python', 0, 0),
-(2, 'Java', 0, 0),
-(3, 'C#', 0, 0),
-(4, 'JavaScript', 0, 0);
 INSERT INTO UserPreferencesWeights (view_weight, like_weight, subscription_weight) VALUES (0.33, 0.33, 0.34);
 -- -----------------------------------
 -- Insert Sample Data into RepositoryComments Table
@@ -272,16 +267,6 @@ INSERT INTO CommentLikes (comment_id, user_id, is_star) VALUES
 -- Insert Sample Data into RepositorySubscriptions Table
 -- -----------------------------------
 
-INSERT INTO RepositorySubscriptions (repo_id, user_id) VALUES
-(1, 2),
-(1, 3),
-(2, 1),
-(3, 4),
-(4, 2),
-(5, 1),
-(6, 3),
-(7, 4),
-(8, 1);
 
 -- -----------------------------------
 -- Insert Sample Data into Branches Table
@@ -377,4 +362,84 @@ CREATE TABLE IF NOT EXISTS WeatherData (
     wind_speed DECIMAL(5,2) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- Add more user preferences
+INSERT INTO UserPreferences (user_id, language, view_count, like_count) VALUES
+(1, 'Python', 5, 3),
+(1, 'JavaScript', 4, 2),
+(1, 'Java', 2, 1),
+(2, 'Java', 6, 4),
+(2, 'Python', 3, 2),
+(3, 'C#', 4, 3),
+(3, 'TypeScript', 5, 2),
+(4, 'JavaScript', 3, 2),
+(4, 'Python', 4, 1);
 
+-- Add more repository subscriptions to create a chain
+INSERT INTO RepositorySubscriptions (repo_id, user_id) VALUES
+(1, 2), -- Python repo
+(2, 3), -- JavaScript repo
+(3, 1), -- Java repo
+(4, 2), -- C# repo
+(1, 4), -- Python repo (creates a chain)
+(2, 4), -- JavaScript repo (creates another chain)
+(3, 2), -- Java repo (creates a cycle)
+(4, 3); -- C# repo (creates another cycle)
+
+
+
+DELIMITER //
+
+CREATE PROCEDURE CalculateUserWeights(
+    IN p_user_id INT,
+    IN p_view_weight DECIMAL(10,2),
+    IN p_like_weight DECIMAL(10,2),
+    IN p_subscription_weight DECIMAL(10,2)
+)
+BEGIN
+    -- Create temporary tables
+    CREATE TEMPORARY TABLE IF NOT EXISTS UserWeights (
+        language VARCHAR(50) PRIMARY KEY,
+        base_weight DECIMAL(10,2) DEFAULT 0,
+        subscription_weight DECIMAL(10,2) DEFAULT 0
+    );
+
+    -- Insert base weights from UserPreferences
+    INSERT INTO UserWeights (language, base_weight)
+    SELECT 
+        UP.language,
+        ROUND((COALESCE(UP.view_count, 0) * p_view_weight + 
+         COALESCE(UP.like_count, 0) * p_like_weight), 2) as base_weight
+    FROM UserPreferences UP
+    WHERE UP.user_id = p_user_id;
+
+    -- Calculate subscription weights and insert/update for all relevant languages
+    INSERT INTO UserWeights (language, subscription_weight)
+    SELECT 
+        R.language,
+        ROUND(SUM(
+            (COALESCE(UP.view_count, 0) * p_view_weight + 
+             COALESCE(UP.like_count, 0) * p_like_weight)
+        ) * p_subscription_weight, 2) as sub_weight
+    FROM RepositorySubscriptions RS
+    JOIN Repositories R ON RS.repo_id = R.repo_id
+    JOIN UserPreferences UP ON R.user_id = UP.user_id AND R.language = UP.language
+    WHERE RS.user_id = p_user_id
+    GROUP BY R.language
+    ON DUPLICATE KEY UPDATE
+        subscription_weight = VALUES(subscription_weight);
+
+    -- Return results with proper language names and weights
+    SELECT 
+        language,
+        ROUND(COALESCE(base_weight, 0), 2) as baseWeight,
+        ROUND(COALESCE(subscription_weight, 0), 2) as subscriptionWeight,
+        ROUND(COALESCE(base_weight, 0) + COALESCE(subscription_weight, 0), 2) as totalWeight
+    FROM UserWeights
+    WHERE (COALESCE(base_weight, 0) + COALESCE(subscription_weight, 0)) > 0
+    ORDER BY (COALESCE(base_weight, 0) + COALESCE(subscription_weight, 0)) DESC;
+
+    -- Cleanup
+    DROP TEMPORARY TABLE IF EXISTS UserWeights;
+END //
+
+DELIMITER ;

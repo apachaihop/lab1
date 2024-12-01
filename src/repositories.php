@@ -1,13 +1,41 @@
 <?php
+
 ob_start();
 require_once 'connection.php';
 require_once '../vendor/autoload.php';
 require_once 'cache_manager.php';
 require_once 'user_weight_calculator.php';
+require_once 'Middleware/ProfilingMiddleware.php';
 
 session_start();
 
 use App\CacheManager;
+use Anko\Lab1\Middleware\ProfilingMiddleware;
+use Anko\Lab1\Debug\DebugBarManager;
+use Monolog\Logger;
+use Monolog\Handler\StreamHandler;
+
+// Initialize Logger
+$logger = new Logger('app');
+$logger->pushHandler(new StreamHandler(__DIR__ . '/../logs/app.log', Logger::DEBUG));
+
+// Initialize profiler
+$profiler = new ProfilingMiddleware($logger);
+
+// Initialize DebugBar
+try {
+    DebugBarManager::initialize();
+} catch (\Exception $e) {
+    error_log("Failed to initialize DebugBar: " . $e->getMessage());
+}
+
+$debugbar = DebugBarManager::getDebugBar();
+$debugbar['messages']->addMessage('DebugBar initialized');
+if (DebugBarManager::isEnabled()) {
+    $debugbar['time']->startMeasure('page_render', 'Page Rendering');
+    $debugbarRenderer = DebugBarManager::getRenderer();
+    echo $debugbarRenderer->renderHead();
+}
 
 try {
     $conn = getConnection();
@@ -20,6 +48,12 @@ try {
         // Clear the cache metadata cookie
         setcookie('weights_cache_metadata', '', time() - 3600, '/');
         // Redirect to prevent form resubmission
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
+    if (isset($_POST['weight_calculator'])) {
+        $_SESSION['weight_calculator'] = $_POST['weight_calculator'];
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
@@ -40,11 +74,40 @@ try {
 
 
     if ($user_id) {
-        echo "<form method='post' class='mb-3'>
-            <button type='submit' name='clear_cache' class='btn btn-warning btn-sm'>
-                Clear Cache
-            </button>
-        </form>";
+        echo '<div class="container mt-3">
+            <div class="row">
+                <div class="col-md-6">
+                    <form method="post" class="mb-3">
+                        <button type="submit" name="clear_cache" class="btn btn-warning btn-sm">
+                            Clear Cache
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <form method="post" class="mb-3">
+                        <div class="input-group">
+                            <select name="weight_calculator" class="form-select form-select-sm">
+                                <option value="stored_procedure" ' . (($_SESSION['weight_calculator'] ?? '') === 'stored_procedure' ? 'selected' : '') . '>
+                                    Stored Procedure (Fast)
+                                </option>
+                                <option value="recursive" ' . (($_SESSION['weight_calculator'] ?? '') === 'recursive' ? 'selected' : '') . '>
+                                    Recursive PHP (Detailed)
+                                </option>
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                Set Calculator
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>';
+
+        // Add a small indicator showing current calculation method
+        $currentMethod = $_SESSION['weight_calculator'] ?? 'stored_procedure';
+        echo '<div class="small text-muted mb-3">
+            Current calculation method: ' . ucfirst(str_replace('_', ' ', $currentMethod)) . '
+        </div>
+        </div>';
     }
 
     // Display user weights if available
@@ -53,11 +116,17 @@ try {
             <h4>User Preferences (" . ($userWeightsData['isCached'] ? 'Cached' : 'Live') . "):</h4>
             <ul>";
 
-        foreach ($userWeightsData['weights'] as $language => $weight) {
-            echo "<li>Language: {$language}, 
+        // Sort weights by total weight descending
+        $weights = $userWeightsData['weights'];
+        arsort($weights);
+
+        $index = 0;
+        foreach ($weights as $language => $weight) {
+            echo "<li>" . $index . ". Language: {$language}, 
                  Base Weight: {$weight['baseWeight']}, 
                  Subscription Weight: {$weight['subscriptionWeight']}, 
                  Total Weight: {$weight['totalWeight']}</li>";
+            $index++;
         }
         echo "</ul>";
 
@@ -415,15 +484,15 @@ try {
             $sql .= " ORDER BY user_preference DESC, total_likes DESC, R.created_at DESC";
         }
 
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            die("Prepare failed: " . $conn->error);
-        }
-        $stmt->bind_param($types, ...$params);
-        if (!$stmt->execute()) {
-            die("Execute failed: " . $stmt->error);
-        }
-        $result = $stmt->get_result();
+        // Profile the main repository query
+        $profiled = $profiler->profile(function () use ($conn, $sql, $params, $types) {
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            return $stmt->get_result();
+        }, 'main_repository_query');
+
+        $result = $profiled['result'];
 
         $repositories = [];
         while ($row = $result->fetch_assoc()) {
@@ -492,7 +561,9 @@ try {
                 <div class="alert alert-warning" role="alert">No repositories found.</div>
             <?php endif; ?>
 
-            <?php $stmt->close(); ?>
+            <?php if (isset($stmt) && $stmt): ?>
+                <?php $stmt->close(); ?>
+            <?php endif; ?>
         </div>
 <?php
     }
@@ -511,6 +582,15 @@ try {
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<?php if (DebugBarManager::isEnabled()): ?>
+    <?php
+    $debugbar = DebugBarManager::getDebugBar();
+    $debugbar['time']->stopMeasure('page_render');
+    $debugbarRenderer = DebugBarManager::getRenderer();
+    echo $debugbarRenderer->render();
+    ?>
+<?php endif; ?>
 
 <!-- Cache Status and File Preview Scripts -->
 <script>

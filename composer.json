@@ -12,7 +12,23 @@
         }
     ],
     "require": {
-        "monolog/monolog": "^3.7",
-        "symfony/cache": "^7.1"
+        "maximebf/debugbar": "^1.18",
+        "symfony/stopwatch": "^5.4",
+        "monolog/monolog": "^2.0"
+    },
+    "require-dev": {
+        "symfony/profiler-pack": "^1.0",
+        "phpstan/phpstan": "^1.10"
+    },
+    "scripts": {
+        "analyze": "phpstan analyze src --level=5",
+        "profile": "php -d xdebug.mode=profile src/repositories.php",
+        "optimize": [
+            "composer dump-autoload --optimize",
+            "php -d opcache.enable_cli=1 -d opcache.jit_buffer_size=100M"
+        ]
+    },
+    "config": {
+        "sort-packages": true
     }
 }

@@ -6,6 +6,10 @@ use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Symfony\Component\Cache\CacheItem;
 use Monolog\Logger;
 use Monolog\Handler\StreamHandler;
+use Anko\Lab1\Profiler\QueryProfiler;
+use Anko\Lab1\Debug\DebugBarManager;
+use Anko\Lab1\WeightCalculator\StoredProcedureCalculator;
+use Anko\Lab1\WeightCalculator\RecursiveWeightCalculator;
 
 class CacheManager
 {
@@ -13,14 +17,16 @@ class CacheManager
     private $logger;
     private $conn;
     private $cacheDuration;
+    private $profiler;
 
-    public function __construct($conn, $cacheDuration = 3600)
+    public function __construct($conn, $cacheDuration = 3600, $profiler = null)
     {
         $this->cache = new FilesystemAdapter();
         $this->logger = new Logger('cache');
-        $this->logger->pushHandler(new StreamHandler(__DIR__ . '/logs/cache.log', Logger::DEBUG));
+        $this->logger->pushHandler(new StreamHandler(__DIR__ . '/repository_files/cache.log', Logger::DEBUG));
         $this->conn = $conn;
         $this->cacheDuration = $cacheDuration;
+        $this->profiler = $profiler;
     }
 
     public function getUserWeights($userId)
@@ -29,150 +35,46 @@ class CacheManager
         $isCached = $this->cache->hasItem($cacheKey);
         $cacheStatus = $this->getCacheStatus($userId);
 
-        $weights = $this->cache->get($cacheKey, function (CacheItem $item) use ($userId) {
-            return $this->calculateWeights($userId, $item);
+        // Get the weights from admin settings
+        $weightStmt = $this->conn->prepare("SELECT * FROM UserPreferencesWeights LIMIT 1");
+        $weightStmt->execute();
+        $weights = $weightStmt->get_result()->fetch_assoc();
+        $weightStmt->close();
+
+        $cachedWeights = $this->cache->get($cacheKey, function (CacheItem $item) use ($userId, $weights) {
+            $item->expiresAfter($this->cacheDuration);
+            return $this->calculateWeights($userId, $weights);
         });
 
         $this->setCacheMetadataCookie($userId, $isCached);
 
         return [
-            'weights' => $weights,
+            'weights' => $cachedWeights,
             'isCached' => $isCached,
             'cached_at' => $cacheStatus['cached_at'],
             'expires_in' => $cacheStatus['expires_in_minutes']
         ];
     }
 
-    private function calculateWeights($userId, CacheItem $item)
+    private function calculateWeights(int $userId, array $weights): array
     {
-        $item->expiresAfter($this->cacheDuration);
+        $strategy = $_SESSION['weight_calculator'] ?? 'stored_procedure';
+        $calculatorClass = match ($strategy) {
+            'stored_procedure' => StoredProcedureCalculator::class,
+            'recursive' => RecursiveWeightCalculator::class,
+            default => StoredProcedureCalculator::class
+        };
 
-        try {
-            // Get weights from UserPreferencesWeights table
-            $weightStmt = $this->conn->prepare("SELECT * FROM UserPreferencesWeights LIMIT 1");
-            $weightStmt->execute();
-            $weights = $weightStmt->get_result()->fetch_assoc();
-            $weightStmt->close();
+        $calculator = new $calculatorClass($this->conn, $this->profiler);
+        $result = $calculator->calculateWeights($userId, $weights);
 
-            // Get user preferences
-            $debugStmt = $this->conn->prepare("
-                SELECT language, view_count, like_count
-                FROM UserPreferences
-                WHERE user_id = ?
-            ");
-            $debugStmt->bind_param("i", $userId);
-            $debugStmt->execute();
-            $debugResult = $debugStmt->get_result();
+        // Log the calculation strategy used
+        $this->logger->debug('Weight calculation performed', [
+            'strategy' => $strategy,
+            'user_id' => $userId
+        ]);
 
-            $calculatedWeights = [];
-            while ($pref = $debugResult->fetch_assoc()) {
-                // Calculate weights exactly like in the debug statement
-                $weightValues = calculateUserWeight($this->conn, $userId, $weights, $pref['language']);
-                $baseWeight = $weightValues[0];
-                $subscriptionWeight = $weightValues[1];
-                $totalWeight = $baseWeight + $subscriptionWeight;
-
-                $calculatedWeights[$pref['language']] = [
-                    'baseWeight' => $baseWeight,
-                    'subscriptionWeight' => $subscriptionWeight,
-                    'totalWeight' => $totalWeight,
-                    'views' => $pref['view_count'],
-                    'likes' => $pref['like_count']
-                ];
-            }
-            $debugStmt->close();
-
-            $this->logger->debug('Calculated weights', [
-                'user_id' => $userId,
-                'weights' => $calculatedWeights
-            ]);
-
-            return $calculatedWeights;
-        } catch (\Exception $e) {
-            $this->logger->error('Error calculating weights', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            return [];
-        }
-    }
-
-    private function calculateUserWeight($userId, $weights, $language)
-    {
-        try {
-            $stmt = $this->conn->prepare("
-                SELECT view_count, like_count 
-                FROM UserPreferences 
-                WHERE user_id = ? AND language = ?
-            ");
-            $stmt->bind_param("is", $userId, $language);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $data = $result->fetch_assoc();
-            $stmt->close();
-
-            if (!$data) {
-                $this->logger->warning('No preference data found for user', [
-                    'user_id' => $userId,
-                    'language' => $language
-                ]);
-                return [0, 0];
-            }
-
-            $viewCount = $data['view_count'];
-            $likeCount = $data['like_count'];
-
-            $baseWeight = ($weights['view_weight'] * $viewCount) + ($weights['like_weight'] * $likeCount);
-            $subscriptionWeight = $this->calculateSubscriptionWeight($userId, $language);
-
-            $this->logger->debug('Weight calculation completed', [
-                'user_id' => $userId,
-                'language' => $language,
-                'base_weight' => $baseWeight,
-                'subscription_weight' => $subscriptionWeight,
-                'view_count' => $viewCount,
-                'like_count' => $likeCount
-            ]);
-
-            return [$baseWeight, $subscriptionWeight];
-        } catch (\Exception $e) {
-            $this->logger->error('Error calculating user weight', [
-                'user_id' => $userId,
-                'language' => $language,
-                'error' => $e->getMessage()
-            ]);
-            return [0, 0];
-        }
-    }
-
-    private function calculateSubscriptionWeight($userId, $language)
-    {
-        // Add your subscription weight logic here
-        // For example:
-        $stmt = $this->conn->prepare("
-            SELECT subscription_level 
-            FROM UserSubscriptions 
-            WHERE user_id = ? AND language = ?
-        ");
-        $stmt->bind_param("is", $userId, $language);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $data = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!$data) {
-            return 0;
-        }
-
-        // Example subscription weight calculation
-        switch ($data['subscription_level']) {
-            case 'premium':
-                return 2.0;
-            case 'basic':
-                return 1.0;
-            default:
-                return 0;
-        }
+        return $result;
     }
 
     private function setCacheMetadataCookie($userId, $isCached)

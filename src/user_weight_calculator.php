@@ -1,12 +1,14 @@
 <?php
-function calculateUserWeight($conn, $user_id, $weights, $language, $visited = array())
-{
-    if (in_array($user_id, $visited)) {
-        return [0, 0];
-    }
-    $visited[] = $user_id;
 
-    // Calculate base weight for the user for the specific language
+use Anko\Lab1\Profiler\QueryProfiler;
+
+function calculateUserWeight($conn, $user_id, $weights, $language, $visited = array(), ?QueryProfiler $profiler = null)
+{
+    if ($profiler) {
+        $profiler->startProfiling("weight_calc_{$user_id}_{$language}");
+    }
+
+    // Calculate base weight
     $baseWeightStmt = $conn->prepare("
         SELECT 
             COALESCE(view_count, 0) as total_views,
@@ -20,24 +22,29 @@ function calculateUserWeight($conn, $user_id, $weights, $language, $visited = ar
     $baseWeight = ($baseWeightResult['total_views'] * $weights['view_weight']) +
         ($baseWeightResult['total_likes'] * $weights['like_weight']);
 
-    // Get subscriptions
+    // Calculate subscription weight (first level only)
     $subscriptionsStmt = $conn->prepare("
-        SELECT DISTINCT R.user_id
+        SELECT 
+            SUM(COALESCE(UP.view_count, 0) * ? + COALESCE(UP.like_count, 0) * ?) as weight_sum
         FROM RepositorySubscriptions RS
         JOIN Repositories R ON RS.repo_id = R.repo_id
+        JOIN UserPreferences UP ON R.user_id = UP.user_id AND R.language = UP.language
         WHERE RS.user_id = ? AND R.language = ?
     ");
-    $subscriptionsStmt->bind_param("is", $user_id, $language);
+    $subscriptionsStmt->bind_param(
+        "ddis",
+        $weights['view_weight'],
+        $weights['like_weight'],
+        $user_id,
+        $language
+    );
     $subscriptionsStmt->execute();
-    $subscriptionsResult = $subscriptionsStmt->get_result();
+    $result = $subscriptionsStmt->get_result()->fetch_assoc();
+    $subscriptionWeight = ($result['weight_sum'] ?? 0) * $weights['subscription_weight'];
 
-    $subscriptionWeight = 0;
-    while ($subscription = $subscriptionsResult->fetch_assoc()) {
-        $subWeight = calculateUserWeight($conn, $subscription['user_id'], $weights, $language, $visited);
-        $subscriptionWeight += $subWeight[0] + $subWeight[1];
+    if ($profiler) {
+        $profiler->stopProfiling("weight_calc_{$user_id}_{$language}");
     }
 
-    $totalSubscriptionWeight = $subscriptionWeight * $weights['subscription_weight'];
-
-    return [$baseWeight, $totalSubscriptionWeight];
+    return [$baseWeight, $subscriptionWeight];
 }
