@@ -2,44 +2,136 @@
 class FileHandler
 {
     public $repoFilesPath;
+    private $maxFileSize = 1048576; // 1MB in bytes
+    private $allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    private $allowedTextTypes = [
+        'text/plain',
+        'text/html',
+        'text/css',
+        'text/javascript',
+        'application/json',
+        'application/xml',
+        'text/x-php',
+        'text/x-python',
+        'text/x-java-source',
+        'text/x-c',
+        'text/markdown',
+        'text/x-sql'
+    ];
 
     public function __construct()
     {
         $this->repoFilesPath = __DIR__ . '/../repository_files/';
+        $this->validateStorageDirectory();
+    }
 
+    private function validateStorageDirectory()
+    {
         if (!file_exists($this->repoFilesPath)) {
             error_log("Repository files directory does not exist: " . $this->repoFilesPath);
-            throw new Exception("Repository files directory does not exist. Please create it manually.");
+            throw new Exception("Storage directory not found. Please contact administrator.");
+        }
+
+        if (!is_dir($this->repoFilesPath)) {
+            error_log("Repository files path is not a directory: " . $this->repoFilesPath);
+            throw new Exception("Invalid storage configuration. Please contact administrator.");
+        }
+
+        if (!is_readable($this->repoFilesPath)) {
+            error_log("Repository files directory is not readable: " . $this->repoFilesPath);
+            throw new Exception("Storage directory is not accessible. Please contact administrator.");
         }
 
         if (!is_writable($this->repoFilesPath)) {
             error_log("Repository files directory is not writable: " . $this->repoFilesPath);
-            throw new Exception("Repository files directory is not writable. Please check permissions.");
+            throw new Exception("Cannot write to storage directory. Please contact administrator.");
         }
     }
 
     public function saveAvatar($conn, $userId, $file)
     {
+        $this->validateUploadedFile($file);
+        $this->validateFileType($file['type'], $this->allowedImageTypes);
+        $this->validateFileSize($file['size']);
+
+        try {
+            $avatarData = @file_get_contents($file['tmp_name']);
+            if ($avatarData === false) {
+                error_log("Failed to read uploaded avatar file: " . $file['tmp_name']);
+                throw new Exception("Failed to process uploaded image. Please try again.");
+            }
+
+            if (!@getimagesizefromstring($avatarData)) {
+                error_log("Invalid image data for user $userId");
+                throw new Exception("The uploaded file is not a valid image.");
+            }
+
+            $stmt = $conn->prepare("UPDATE Users SET avatar_data = ?, avatar_type = ? WHERE user_id = ?");
+            if (!$stmt) {
+                error_log("Failed to prepare avatar update statement: " . $conn->error);
+                throw new Exception("Database error while saving avatar.");
+            }
+
+            $stmt->bind_param("ssi", $avatarData, $file['type'], $userId);
+            if (!$stmt->execute()) {
+                error_log("Failed to execute avatar update: " . $stmt->error);
+                throw new Exception("Failed to save avatar to database.");
+            }
+            $stmt->close();
+
+            return true;
+        } catch (Exception $e) {
+            error_log("Error in saveAvatar: " . $e->getMessage());
+            throw new Exception("Failed to save avatar: " . $e->getMessage());
+        }
+    }
+
+    private function validateUploadedFile($file)
+    {
+        if (!isset($file['error']) || is_array($file['error'])) {
+            throw new Exception("Invalid file parameter.");
+        }
+
+        $uploadErrors = [
+            UPLOAD_ERR_INI_SIZE => "The uploaded file exceeds the upload_max_filesize directive.",
+            UPLOAD_ERR_FORM_SIZE => "The uploaded file exceeds the MAX_FILE_SIZE directive.",
+            UPLOAD_ERR_PARTIAL => "The uploaded file was only partially uploaded.",
+            UPLOAD_ERR_NO_FILE => "No file was uploaded.",
+            UPLOAD_ERR_NO_TMP_DIR => "Missing a temporary folder.",
+            UPLOAD_ERR_CANT_WRITE => "Failed to write file to disk.",
+            UPLOAD_ERR_EXTENSION => "A PHP extension stopped the file upload."
+        ];
+
         if ($file['error'] !== UPLOAD_ERR_OK) {
-            throw new Exception("Error uploading file");
+            $errorMessage = isset($uploadErrors[$file['error']])
+                ? $uploadErrors[$file['error']]
+                : "Unknown upload error";
+            error_log("File upload error: " . $errorMessage);
+            throw new Exception($errorMessage);
         }
 
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        if (!in_array($file['type'], $allowedTypes)) {
-            throw new Exception("Invalid file type. Only JPG, PNG and GIF are allowed.");
+        if (!is_uploaded_file($file['tmp_name'])) {
+            error_log("Potential file upload attack: " . $file['tmp_name']);
+            throw new Exception("Invalid file upload attempt detected.");
         }
+    }
 
-        $avatarData = file_get_contents($file['tmp_name']);
-        if (!@getimagesizefromstring($avatarData)) {
-            throw new Exception("Invalid image file. The file appears to be corrupted.");
+    private function validateFileType($fileType, $allowedTypes)
+    {
+        if (!in_array($fileType, $allowedTypes)) {
+            $allowedExtensions = array_map(function ($type) {
+                return strtoupper(substr($type, strpos($type, '/') + 1));
+            }, $allowedTypes);
+            throw new Exception("Invalid file type. Allowed types: " . implode(', ', $allowedExtensions));
         }
+    }
 
-        $stmt = $conn->prepare("UPDATE Users SET avatar_data = ?, avatar_type = ? WHERE user_id = ?");
-        $stmt->bind_param("ssi", $avatarData, $file['type'], $userId);
-        $success = $stmt->execute();
-        $stmt->close();
-
-        return $success;
+    private function validateFileSize($fileSize)
+    {
+        if ($fileSize > $this->maxFileSize) {
+            $maxSizeMB = $this->maxFileSize / (1024 * 1024);
+            throw new Exception("File size exceeds maximum limit of {$maxSizeMB}MB.");
+        }
     }
 
     public function saveRepoFile($conn, $repoId, $file)
