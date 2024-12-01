@@ -535,7 +535,7 @@ try {
                                     style="width: 40px; height: 40px; object-fit: cover;">
                                 <div>
                                     <h5 class="card-title mb-0"><?= htmlspecialchars($repo['name']) ?></h5>
-                                    <h6 class="card-subtitle text-muted">By <?= htmlspecialchars($repo['username']) ?></h6>
+                                    <h6 class="card-subtitle">By <?= htmlspecialchars($repo['username']) ?></h6>
                                 </div>
                             </div>
                             <p class="card-text"><?= htmlspecialchars($repo['description']) ?></p>

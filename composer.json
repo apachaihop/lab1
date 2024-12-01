@@ -29,6 +29,9 @@
         ]
     },
     "config": {
-        "sort-packages": true
+        "sort-packages": true,
+        "phpmailer/phpmailer": "^6.9",
+        "phpunit/phpunit": "^11.4",
+        "php-webdriver/webdriver": "^1.15"
     }
 }
