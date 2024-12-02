@@ -508,3 +508,124 @@ try {
     });
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+    $(document).ready(function() {
+        // Like Repository Button Handler
+        $('.like-repo-btn').click(function() {
+            const repoId = $(this).data('repo-id');
+            const button = $(this);
+
+            $.ajax({
+                url: 'ajax_handlers.php',
+                type: 'POST',
+                data: {
+                    action: 'like_repo',
+                    repo_id: repoId
+                },
+                success: function(response) {
+                    const data = JSON.parse(response);
+                    if (data.success) {
+                        if (data.liked) {
+                            button.removeClass('btn-outline-primary').addClass('btn-primary');
+                            button.html('<i class="fas fa-thumbs-up"></i> Unlike');
+                        } else {
+                            button.removeClass('btn-primary').addClass('btn-outline-primary');
+                            button.html('<i class="fas fa-thumbs-up"></i> Like');
+                        }
+                        // Update like count if displayed
+                        const likeCount = button.closest('.card-body').find('.text-muted:contains("Total Likes")');
+                        if (likeCount.length) {
+                            const currentCount = parseInt(likeCount.text().match(/\d+/)[0]);
+                            likeCount.text(`Total Likes: ${data.liked ? currentCount + 1 : currentCount - 1}`);
+                        }
+                    }
+                }
+            });
+        });
+
+        // Subscribe Repository Button Handler
+        $('.subscribe-repo-btn').click(function() {
+            const repoId = $(this).data('repo-id');
+            const button = $(this);
+
+            $.ajax({
+                url: 'ajax_handlers.php',
+                type: 'POST',
+                data: {
+                    action: 'subscribe_repo',
+                    repo_id: repoId
+                },
+                success: function(response) {
+                    const data = JSON.parse(response);
+                    if (data.success) {
+                        if (data.subscribed) {
+                            button.removeClass('btn-outline-secondary').addClass('btn-secondary');
+                            button.text('Unsubscribe');
+                        } else {
+                            button.removeClass('btn-secondary').addClass('btn-outline-secondary');
+                            button.text('Subscribe');
+                        }
+                    }
+                }
+            });
+        });
+
+        // Like Comment Button Handler
+        $('.like-comment-btn').click(function() {
+            const commentId = $(this).data('comment-id');
+            const button = $(this);
+
+            $.ajax({
+                url: 'ajax_handlers.php',
+                type: 'POST',
+                data: {
+                    action: 'like_comment',
+                    comment_id: commentId
+                },
+                success: function(response) {
+                    const data = JSON.parse(response);
+                    if (data.success) {
+                        if (data.liked) {
+                            button.removeClass('btn-outline-primary').addClass('btn-primary');
+                            button.html('<i class="fas fa-thumbs-up"></i> Unlike');
+                        } else {
+                            button.removeClass('btn-primary').addClass('btn-outline-primary');
+                            button.html('<i class="fas fa-thumbs-up"></i> Like');
+                        }
+                    }
+                }
+            });
+        });
+
+        // Star Comment Button Handler
+        $('.star-comment-btn').click(function() {
+            const commentId = $(this).data('comment-id');
+            const button = $(this);
+
+            $.ajax({
+                url: 'ajax_handlers.php',
+                type: 'POST',
+                data: {
+                    action: 'star_comment',
+                    comment_id: commentId
+                },
+                success: function(response) {
+                    const data = JSON.parse(response);
+                    if (data.success) {
+                        if (data.starred) {
+                            button.removeClass('btn-outline-warning').addClass('btn-warning');
+                            button.html('<i class="fas fa-star"></i> Unstar');
+                        } else {
+                            button.removeClass('btn-warning').addClass('btn-outline-warning');
+                            button.html('<i class="fas fa-star"></i> Star');
+                        }
+                        // Update star count
+                        const starBadge = button.closest('.list-group-item').find('.badge-warning .fa-star').parent();
+                        starBadge.text(data.starCount);
+                    }
+                }
+            });
+        });
+    });
+</script>

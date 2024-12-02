@@ -100,8 +100,7 @@ function handleRepoSubscribe($conn, $user_id)
     $checkSubStmt = $conn->prepare("SELECT * FROM RepositorySubscriptions WHERE user_id = ? AND repo_id = ?");
     $checkSubStmt->bind_param("ii", $user_id, $repo_id);
     $checkSubStmt->execute();
-    $checkSubStmt->store_result();
-    $isSubscribed = $checkSubStmt->num_rows > 0;
+    $isSubscribed = $checkSubStmt->get_result()->num_rows > 0;
     $checkSubStmt->close();
 
     if ($isSubscribed) {
