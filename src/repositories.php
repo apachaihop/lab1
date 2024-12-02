@@ -323,28 +323,35 @@ try {
                        FROM RepositoryLikes RL
                        WHERE RL.repo_id = R.repo_id
                    ) as total_likes,
-                   CASE WHEN ? IS NOT NULL THEN
-                       (
-                           SELECT 
-                               (COALESCE(UP.view_count, 0) * ? + COALESCE(UP.like_count, 0) * ?) +
-                               (
-                                   SELECT COALESCE(SUM(
-                                       (COALESCE(UPS.view_count, 0) * ? + COALESCE(UPS.like_count, 0) * ?)
-                                   ), 0) * ?
-                                   FROM UserPreferences UPS
-                                   JOIN RepositorySubscriptions RS ON RS.user_id = ?
-                                   JOIN Repositories RS_R ON RS.repo_id = RS_R.repo_id
-                                   WHERE UPS.user_id = RS_R.user_id AND UPS.language = R.language
-                               )
-                           FROM UserPreferences UP
+                   CASE 
+                       WHEN ? IS NOT NULL AND EXISTS (
+                           SELECT 1 
+                           FROM UserPreferences UP 
                            WHERE UP.user_id = ? AND UP.language = R.language
-                       )
-                   ELSE 0 END as user_preference
+                       ) THEN
+                           (
+                               SELECT 
+                                   (COALESCE(UP.view_count, 0) * ? + COALESCE(UP.like_count, 0) * ?) +
+                                   (
+                                       SELECT COALESCE(SUM(
+                                           (COALESCE(UPS.view_count, 0) * ? + COALESCE(UPS.like_count, 0) * ?)
+                                       ), 0) * ?
+                                       FROM UserPreferences UPS
+                                       JOIN RepositorySubscriptions RS ON RS.user_id = ?
+                                       JOIN Repositories RS_R ON RS.repo_id = RS_R.repo_id
+                                       WHERE UPS.user_id = RS_R.user_id AND UPS.language = R.language
+                                   )
+                               FROM UserPreferences UP
+                               WHERE UP.user_id = ? AND UP.language = R.language
+                           )
+                       ELSE 0 
+                   END as user_preference
             FROM Repositories AS R 
             JOIN Users AS U ON R.user_id = U.user_id
         ";
 
         $params = [
+            $user_id,
             $user_id,
             $weights['view_weight'],
             $weights['like_weight'],
@@ -354,7 +361,7 @@ try {
             $user_id,
             $user_id
         ];
-        $types = "idddddii";
+        $types = "iidddddii";
 
         if ($searchField && $searchTerm) {
             $sql .= " WHERE R.$searchField LIKE ?";
