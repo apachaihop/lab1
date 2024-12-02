@@ -64,9 +64,11 @@ if (!isset($_SESSION['user_id'])) {
     $_SESSION['user_id'] = null;
     $_SESSION['is_admin'] = null;
 }
+
+$currentTheme = isset($_COOKIE['theme']) ? hash_equals(hash('sha256', 'dark'), $_COOKIE['theme']) ? 'dark' : 'light' : 'light';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?= $currentTheme ?>">
 
 <head>
     <meta charset="UTF-8">
@@ -78,6 +80,44 @@ if (!isset($_SESSION['user_id'])) {
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --card-bg: #2d2d2d;
+            --border-color: #404040;
+            --navbar-bg: #2d2d2d;
+            --navbar-color: #ffffff;
+            --input-bg: #333333;
+            --input-color: #ffffff;
+            --modal-bg: #2d2d2d;
+            --modal-color: #ffffff;
+        }
+
+        [data-theme="light"] {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f8f9fa;
+            --border-color: #dee2e6;
+            --navbar-bg: #f8f9fa;
+            --navbar-color: #000000;
+            --input-bg: #ffffff;
+            --input-color: #000000;
+            --modal-bg: #ffffff;
+            --modal-color: #000000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+    </style>
 </head>
 
 <body>
@@ -117,7 +157,49 @@ if (!isset($_SESSION['user_id'])) {
                         <li class="nav-item"><a class="nav-link" href="/lab1/src/auth/register.php">Register</a></li>
                     <?php endif; ?>
                 </ul>
+                <div class="nav-item ml-auto">
+                    <button id="themeToggle" class="btn btn-outline-secondary">
+                        <i class="fas fa-moon" id="darkIcon"></i>
+                        <i class="fas fa-sun" id="lightIcon" style="display: none;"></i>
+                    </button>
+                </div>
             </div>
         </nav>
     </header>
     <main class="container">
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const themeToggle = document.getElementById('themeToggle');
+                const darkIcon = document.getElementById('darkIcon');
+                const lightIcon = document.getElementById('lightIcon');
+
+                function setTheme(isDark) {
+                    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+                    darkIcon.style.display = isDark ? 'none' : 'inline';
+                    lightIcon.style.display = isDark ? 'inline' : 'none';
+
+                    // Set secure cookie with hashed theme value
+                    const themeValue = isDark ? 'dark' : 'light';
+                    const hashedTheme = async () => {
+                        const encoder = new TextEncoder();
+                        const data = encoder.encode(themeValue);
+                        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                        const hashArray = Array.from(new Uint8Array(hashBuffer));
+                        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    };
+
+                    hashedTheme().then(hash => {
+                        document.cookie = `theme=${hash}; path=/; secure; samesite=Strict; max-age=31536000`;
+                    });
+                }
+
+                themeToggle.addEventListener('click', function() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme');
+                    setTheme(currentTheme === 'light');
+                });
+            });
+        </script>
+</body>
+
+</html>

@@ -168,3 +168,120 @@ main {
 #fileContent::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+[data-theme="dark"] .modal-content {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .modal-footer {
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .table {
+    color: var(--text-color);
+}
+
+[data-theme="dark"] .table-bordered {
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .form-control {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+    color: var(--text-color);
+}
+
+#themeToggle {
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    transition: all 0.15s ease-in-out;
+}
+
+[data-theme="dark"] #themeToggle {
+    color: #fff;
+    border-color: #fff;
+}
+
+[data-theme="dark"] {
+    /* Navbar styles */
+    .navbar {
+        background-color: var(--navbar-bg) !important;
+    }
+
+    .navbar-light .navbar-brand,
+    .navbar-light .navbar-nav .nav-link {
+        color: var(--navbar-color) !important;
+    }
+
+    /* Form controls */
+    .form-control {
+        background-color: var(--input-bg);
+        color: var(--input-color);
+        border-color: var(--border-color);
+    }
+
+    .form-control:focus {
+        background-color: var(--input-bg);
+        color: var(--input-color);
+    }
+
+    /* Tables */
+    .table {
+        color: var(--text-color);
+    }
+
+    .table-bordered th,
+    .table-bordered td {
+        border-color: var(--border-color);
+    }
+
+    /* Modal styles */
+    .modal-content {
+        background-color: var(--modal-bg);
+        color: var(--modal-color);
+    }
+
+    /* List group items */
+    .list-group-item {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+        border-color: var(--border-color);
+    }
+
+    /* File preview */
+    .file-preview {
+        background-color: var(--card-bg);
+    }
+
+    #fileContent {
+        background-color: var(--card-bg);
+        color: var(--text-color);
+    }
+
+    /* Footer */
+    .footer {
+        background-color: var(--navbar-bg) !important;
+    }
+
+    .text-muted {
+        color: #a0a0a0 !important;
+    }
+
+    /* Scrollbar colors */
+    ::-webkit-scrollbar-track {
+        background: var(--card-bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #555;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #666;
+    }
+}
