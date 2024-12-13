@@ -57,12 +57,26 @@ try {
     $filePath = $repoId . '/' . $fileName;
 
     if (!$fileHandler->isPDF($filePath)) {
-        echo json_encode(['readable' => false, 'error' => 'Not a PDF file']);
+        echo json_encode([
+            'readable' => false,
+            'error' => 'Not a PDF file'
+        ]);
         exit();
     }
 
     $isReadable = $fileHandler->isPDFReadable($filePath);
-    echo json_encode(['readable' => $isReadable]);
+    if (!$isReadable) {
+        echo json_encode([
+            'readable' => false,
+            'error' => 'PDF file is not accessible or may be corrupted'
+        ]);
+        exit();
+    }
+
+    echo json_encode([
+        'readable' => true,
+        'success' => true
+    ]);
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);

@@ -511,7 +511,7 @@ try {
                         .then(response => response.json())
                         .then(readableData => {
                             if (!readableData.readable) {
-                                throw new Error('PDF file is not accessible or corrupted');
+                                throw new Error(readableData.error || 'PDF file is not accessible');
                             }
 
                             pdfViewer.style.display = 'block';
@@ -521,12 +521,7 @@ try {
                             embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
 
                             embedElement.onerror = function() {
-                                modalBody.prepend(`
-                                    <div class="alert alert-danger">
-                                        Failed to load PDF file. The file might be corrupted or you may not have permission to view it.
-                                    </div>
-                                `);
-                                pdfViewer.style.display = 'none';
+                                throw new Error('Failed to load PDF file. The file might be corrupted or you may not have permission to view it.');
                             };
                         })
                         .catch(error => {

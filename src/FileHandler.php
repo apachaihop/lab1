@@ -361,20 +361,42 @@ class FileHandler
     public function isPDFReadable($filePath)
     {
         $fullPath = $this->repoFilesPath . $filePath;
+
+        // Basic checks
         if (!file_exists($fullPath) || !is_readable($fullPath)) {
             return false;
         }
 
-        // Try to read the first few bytes
-        $handle = @fopen($fullPath, 'rb');
-        if (!$handle) {
+        // Check if it's actually a PDF
+        if (!$this->isPDF($filePath)) {
             return false;
         }
 
-        $header = @fread($handle, 4);
-        @fclose($handle);
+        try {
+            // Try to read the first few bytes
+            $handle = @fopen($fullPath, 'rb');
+            if (!$handle) {
+                return false;
+            }
 
-        // Check for PDF signature and valid read
-        return $header !== false && $header === '%PDF';
+            $header = @fread($handle, 4);
+            @fclose($handle);
+
+            // Verify PDF signature and successful read
+            if ($header === false || $header !== '%PDF') {
+                return false;
+            }
+
+            // Try to get file size
+            $fileSize = @filesize($fullPath);
+            if ($fileSize === false || $fileSize === 0) {
+                return false;
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log("PDF read check failed for file: " . $filePath . " - " . $e->getMessage());
+            return false;
+        }
     }
 }
