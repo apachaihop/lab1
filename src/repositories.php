@@ -88,7 +88,7 @@ try {
                         <div class="input-group">
                             <select name="weight_calculator" class="form-select form-select-sm">
                                 <option value="stored_procedure" ' . (($_SESSION['weight_calculator'] ?? '') === 'stored_procedure' ? 'selected' : '') . '>
-                                    Stored Procedure (Fast)
+                                    Stored Procedure
                                 </option>
                                 <option value="recursive" ' . (($_SESSION['weight_calculator'] ?? '') === 'recursive' ? 'selected' : '') . '>
                                     Recursive PHP (Detailed)
