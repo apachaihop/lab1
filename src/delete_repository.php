@@ -17,7 +17,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $conn->begin_transaction();
 
     try {
-        // First, delete all subscriptions for this repository
+        // First, delete all files associated with this repository
+        $filesStmt = $conn->prepare("SELECT file_name FROM RepositoryFiles WHERE repo_id = ?");
+        $filesStmt->bind_param("i", $repo_id);
+        $filesStmt->execute();
+        $filesResult = $filesStmt->get_result();
+
+        $fileHandler = new FileHandler();
+        while ($file = $filesResult->fetch_assoc()) {
+            $fileHandler->deleteRepoFile($conn, $repo_id, $file['file_name']);
+        }
+        $filesStmt->close();
+
+        // Delete all subscriptions for this repository
         $deleteSubscriptionsStmt = $conn->prepare("DELETE FROM RepositorySubscriptions WHERE repo_id = ?");
         $deleteSubscriptionsStmt->bind_param("i", $repo_id);
         $deleteSubscriptionsStmt->execute();
@@ -33,13 +45,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         $deleteRepoStmt->close();
-
-        // If we've made it this far without errors, commit the transaction
         $conn->commit();
 
         $_SESSION['success_message'] = "Repository deleted successfully.";
     } catch (Exception $e) {
-        // An error occurred; rollback the transaction
         $conn->rollback();
         $_SESSION['error_message'] = "Error deleting repository: " . $e->getMessage();
     }

@@ -287,7 +287,10 @@ try {
                                     </button>
                                 </div>
                                 <div class="modal-body">
-                                    <pre id="fileContent"></pre>
+                                    <div id="pdfViewer" style="display: none;">
+                                        <embed src="" type="application/pdf" width="100%" height="600px" />
+                                    </div>
+                                    <pre id="fileContent" style="display: none;"></pre>
                                 </div>
                             </div>
                         </div>
@@ -489,28 +492,71 @@ try {
 <!-- File Preview Script -->
 <script>
     function previewFile(repoId, fileName) {
-        fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+        const modal = $('#filePreviewModal');
+        const modalBody = modal.find('.modal-body');
+        const errorDiv = $('<div class="alert alert-danger"></div>');
+
+        fetch(`check_file_type.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Failed to check file type');
+                    });
                 }
-                return response.text();
+                return response.json();
             })
-            .then(content => {
-                const preElement = document.getElementById('fileContent');
-                preElement.textContent = content;
-                $('#filePreviewModal').modal('show');
+            .then(data => {
+                if (data.isPDF) {
+                    const pdfViewer = document.getElementById('pdfViewer');
+                    const embedElement = pdfViewer.querySelector('embed');
+                    embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
+                    embedElement.onerror = function() {
+                        errorDiv.text('Failed to load PDF file. The file might be corrupted, invalid, or you may not have permission to view it.');
+                        modalBody.prepend(errorDiv);
+                        pdfViewer.style.display = 'none';
+                    };
+                    pdfViewer.style.display = 'block';
+                    document.getElementById('fileContent').style.display = 'none';
+                    errorDiv.remove();
+                } else {
+                    fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                return response.json().then(err => {
+                                    throw new Error(err.error || 'Failed to load file');
+                                });
+                            }
+                            return response.text();
+                        })
+                        .then(content => {
+                            const preElement = document.getElementById('fileContent');
+                            preElement.textContent = content;
+                            preElement.style.display = 'block';
+                            document.getElementById('pdfViewer').style.display = 'none';
+                            errorDiv.remove();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            errorDiv.text(`Error loading file: ${error.message}`);
+                            modalBody.prepend(errorDiv);
+                        });
+                }
+                modal.modal('show');
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error loading file: ' + error.message);
+                errorDiv.text(`Error: ${error.message}`);
+                modalBody.prepend(errorDiv);
+                modal.modal('show');
             });
     }
 
-    // Add this to handle modal closing
+    // Update modal close handler
     $(document).ready(function() {
         $('#filePreviewModal').on('hidden.bs.modal', function() {
             document.getElementById('fileContent').textContent = '';
+            document.getElementById('pdfViewer').querySelector('embed').src = '';
+            $(this).find('.alert-danger').remove();
         });
     });
 </script>

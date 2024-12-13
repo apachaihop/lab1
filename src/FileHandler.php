@@ -18,6 +18,7 @@ class FileHandler
         'text/markdown',
         'text/x-sql'
     ];
+    private $allowedPDFTypes = ['application/pdf'];
 
     public function __construct()
     {
@@ -140,6 +141,17 @@ class FileHandler
             error_log("Starting saveRepoFile for repoId: " . $repoId);
             error_log("File data: " . print_r($file, true));
 
+            // Validate file size
+            $this->validateFileSize($file['size']);
+
+            // Validate file type
+            $allowedTypes = array_merge(
+                $this->allowedTextTypes,
+                $this->allowedImageTypes,
+                $this->allowedPDFTypes
+            );
+            $this->validateFileType($file['type'], $allowedTypes);
+
             $maxFileSize = 1 * 1024 * 1024;
             if ($file['size'] > $maxFileSize) {
                 error_log("File size exceeds limit: " . $file['size'] . " bytes");
@@ -161,6 +173,24 @@ class FileHandler
                     : 'Unknown upload error';
                 error_log("File upload error: " . $errorMessage);
                 throw new Exception("Error uploading file: " . $errorMessage);
+            }
+
+            // Additional PDF validation for PDF files
+            if ($file['type'] === 'application/pdf') {
+                $tmpName = $file['tmp_name'];
+
+                // Check PDF signature
+                $handle = fopen($tmpName, 'rb');
+                if (!$handle) {
+                    throw new Exception("Cannot read temporary file");
+                }
+
+                $header = fread($handle, 4);
+                fclose($handle);
+
+                if ($header !== '%PDF') {
+                    throw new Exception("Invalid PDF file");
+                }
             }
 
             $fileName = basename($file['name']);
@@ -222,33 +252,109 @@ class FileHandler
     {
         $fullPath = $this->repoFilesPath . $filePath;
         if (!file_exists($fullPath)) {
-            throw new Exception("File not found");
+            throw new Exception("File not found in repository");
         }
-        return file_get_contents($fullPath);
+
+        if (!is_readable($fullPath)) {
+            error_log("File not readable: " . $fullPath);
+            throw new Exception("Unable to read file. Please contact administrator.");
+        }
+
+        $content = file_get_contents($fullPath);
+        if ($content === false) {
+            error_log("Failed to read file contents: " . $fullPath);
+            throw new Exception("Error reading file contents. Please try again.");
+        }
+
+        return $content;
     }
 
     public function deleteRepoFile($conn, $repoId, $fileName)
     {
         $stmt = $conn->prepare("SELECT file_path FROM RepositoryFiles WHERE repo_id = ? AND file_name = ?");
+        if (!$stmt) {
+            throw new Exception("Database error while preparing to delete file");
+        }
+
         $stmt->bind_param("is", $repoId, $fileName);
-        $stmt->execute();
+        if (!$stmt->execute()) {
+            throw new Exception("Database error while checking file existence");
+        }
+
         $result = $stmt->get_result();
         $file = $result->fetch_assoc();
         $stmt->close();
 
-        if ($file) {
-            $fullPath = $this->repoFilesPath . $file['file_path'];
-            if (file_exists($fullPath)) {
-                unlink($fullPath);
-            }
-
-            $stmt = $conn->prepare("DELETE FROM RepositoryFiles WHERE repo_id = ? AND file_name = ?");
-            $stmt->bind_param("is", $repoId, $fileName);
-            $success = $stmt->execute();
-            $stmt->close();
-
-            return $success;
+        if (!$file) {
+            throw new Exception("File not found in database");
         }
-        return false;
+
+        $fullPath = $this->repoFilesPath . $file['file_path'];
+        if (!file_exists($fullPath)) {
+            error_log("Physical file missing: " . $fullPath);
+            throw new Exception("File not found in storage");
+        }
+
+        if (!is_writable(dirname($fullPath))) {
+            error_log("Directory not writable: " . dirname($fullPath));
+            throw new Exception("Unable to delete file due to permissions");
+        }
+
+        if (!unlink($fullPath)) {
+            error_log("Failed to delete file: " . $fullPath);
+            throw new Exception("Failed to delete file from storage");
+        }
+
+        $stmt = $conn->prepare("DELETE FROM RepositoryFiles WHERE repo_id = ? AND file_name = ?");
+        if (!$stmt) {
+            throw new Exception("Database error while preparing to remove file record");
+        }
+
+        $stmt->bind_param("is", $repoId, $fileName);
+        if (!$stmt->execute()) {
+            throw new Exception("Database error while removing file record");
+        }
+
+        $success = $stmt->affected_rows > 0;
+        $stmt->close();
+
+        return $success;
+    }
+
+    public function isPDF($filePath)
+    {
+        $fullPath = $this->repoFilesPath . $filePath;
+        if (!file_exists($fullPath)) {
+            return false;
+        }
+
+        $mimeType = mime_content_type($fullPath);
+        return in_array($mimeType, $this->allowedPDFTypes);
+    }
+
+    public function isValidPDF($filePath)
+    {
+        $fullPath = $this->repoFilesPath . $filePath;
+        if (!file_exists($fullPath)) {
+            return false;
+        }
+
+        // Check MIME type
+        $mimeType = mime_content_type($fullPath);
+        if (!in_array($mimeType, $this->allowedPDFTypes)) {
+            return false;
+        }
+
+        // Read first few bytes to check PDF signature
+        $handle = fopen($fullPath, 'rb');
+        if (!$handle) {
+            return false;
+        }
+
+        $header = fread($handle, 4);
+        fclose($handle);
+
+        // Check for PDF signature %PDF
+        return $header === '%PDF';
     }
 }

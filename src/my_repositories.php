@@ -123,6 +123,26 @@ try {
                 $stmt->close();
             }
         }
+
+        if (isset($_FILES['new_files'])) {
+            $fileHandler = new FileHandler();
+            foreach ($_FILES['new_files']['tmp_name'] as $key => $tmp_name) {
+                if ($_FILES['new_files']['error'][$key] === UPLOAD_ERR_OK) {
+                    $fileData = [
+                        'name' => $_FILES['new_files']['name'][$key],
+                        'type' => $_FILES['new_files']['type'][$key],
+                        'tmp_name' => $tmp_name,
+                        'error' => $_FILES['new_files']['error'][$key],
+                        'size' => $_FILES['new_files']['size'][$key]
+                    ];
+                    try {
+                        $fileHandler->saveRepoFile($conn, $repo_id, $fileData);
+                    } catch (Exception $e) {
+                        $error .= "Error uploading " . htmlspecialchars($fileData['name']) . ": " . $e->getMessage() . "<br>";
+                    }
+                }
+            }
+        }
     }
 
     // Fetch User's Repositories
@@ -206,45 +226,70 @@ try {
 
                                 <!-- Update Modal -->
                                 <div class="modal fade" id="updateModal<?= $repo['repo_id'] ?>" tabindex="-1"
-                                    role="dialog" aria-labelledby="updateModalLabel<?= $repo['repo_id'] ?>"
-                                    aria-hidden="true">
-                                    <div class="modal-dialog" role="document">
+                                    role="dialog">
+                                    <div class="modal-dialog modal-lg" role="document">
                                         <div class="modal-content">
-                                            <form method="post" action="my_repositories.php">
+                                            <form method="post" action="my_repositories.php" enctype="multipart/form-data">
                                                 <div class="modal-header">
-                                                    <h5 class="modal-title" id="updateModalLabel<?= $repo['repo_id'] ?>">
-                                                        Update Repository
-                                                    </h5>
-                                                    <button type="button" class="close" data-dismiss="modal"
-                                                        aria-label="Close">
+                                                    <h5 class="modal-title">Update Repository</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                                         <span aria-hidden="true">&times;</span>
                                                     </button>
                                                 </div>
                                                 <div class="modal-body">
-                                                    <input type="hidden" name="update_repository_id"
-                                                        value="<?= $repo['repo_id'] ?>">
+                                                    <!-- Existing repository fields -->
+                                                    <input type="hidden" name="update_repository_id" value="<?= $repo['repo_id'] ?>">
                                                     <div class="form-group">
-                                                        <label for="name<?= $repo['repo_id'] ?>">Name:</label>
-                                                        <input type="text" class="form-control" id="name<?= $repo['repo_id'] ?>"
-                                                            name="name" value="<?= htmlspecialchars($repo['name']) ?>" required>
+                                                        <label>Name:</label>
+                                                        <input type="text" class="form-control" name="name"
+                                                            value="<?= htmlspecialchars($repo['name']) ?>" required>
                                                     </div>
                                                     <div class="form-group">
-                                                        <label for="description<?= $repo['repo_id'] ?>">Description:</label>
-                                                        <textarea class="form-control" id="description<?= $repo['repo_id'] ?>"
-                                                            name="description" rows="3" required>
-                                                            <?= htmlspecialchars($repo['description']) ?>
-                                                        </textarea>
+                                                        <label>Description:</label>
+                                                        <textarea class="form-control" name="description" required><?= htmlspecialchars($repo['description']) ?></textarea>
                                                     </div>
                                                     <div class="form-group">
-                                                        <label for="language<?= $repo['repo_id'] ?>">Programming Language:</label>
-                                                        <input type="text" class="form-control" id="language<?= $repo['repo_id'] ?>"
-                                                            name="language" value="<?= htmlspecialchars($repo['language']) ?>" required>
+                                                        <label>Programming Language:</label>
+                                                        <input type="text" class="form-control" name="language"
+                                                            value="<?= htmlspecialchars($repo['language']) ?>" required>
+                                                    </div>
+
+                                                    <!-- File Management Section -->
+                                                    <hr>
+                                                    <h6>Manage Files</h6>
+
+                                                    <!-- Existing Files -->
+                                                    <?php
+                                                    $filesStmt = $conn->prepare("SELECT file_name FROM RepositoryFiles WHERE repo_id = ?");
+                                                    $filesStmt->bind_param("i", $repo['repo_id']);
+                                                    $filesStmt->execute();
+                                                    $filesResult = $filesStmt->get_result();
+                                                    ?>
+
+                                                    <?php if ($filesResult->num_rows > 0): ?>
+                                                        <div class="list-group mb-3">
+                                                            <?php while ($file = $filesResult->fetch_assoc()): ?>
+                                                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                                    <?= htmlspecialchars($file['file_name']) ?>
+                                                                    <button type="button" class="btn btn-danger btn-sm delete-file"
+                                                                        data-repo-id="<?= $repo['repo_id'] ?>"
+                                                                        data-file-name="<?= htmlspecialchars($file['file_name']) ?>">
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            <?php endwhile; ?>
+                                                        </div>
+                                                    <?php endif; ?>
+
+                                                    <!-- Add New Files -->
+                                                    <div class="form-group">
+                                                        <label>Add New Files:</label>
+                                                        <input type="file" class="form-control-file" name="new_files[]" multiple>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
-                                                    <button type="button" class="btn btn-secondary"
-                                                        data-dismiss="modal">Close</button>
-                                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-primary">Update Repository</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -273,4 +318,40 @@ try {
 <?php
 closeConnection($conn);
 include '../includes/footer.php';
+?>
+
+<script>
+    $(document).ready(function() {
+        // File deletion handler
+        $('.delete-file').click(function(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to delete this file?')) {
+                return;
+            }
+
+            const button = $(this);
+            const repoId = button.data('repo-id');
+            const fileName = button.data('file-name');
+
+            $.ajax({
+                url: 'delete_repo_file.php',
+                type: 'POST',
+                data: {
+                    repo_id: repoId,
+                    file_name: fileName
+                },
+                success: function(response) {
+                    if (response.success) {
+                        button.closest('.list-group-item').remove();
+                    } else {
+                        alert('Error deleting file: ' + (response.error || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('Error communicating with server');
+                }
+            });
+        });
+    });
+</script>
 ?>
