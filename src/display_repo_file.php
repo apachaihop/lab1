@@ -60,15 +60,15 @@ try {
         $fileContent = $fileHandler->getRepoFile($filePath);
 
         if ($fileHandler->isPDF($filePath)) {
-            // For PDFs, first verify we can actually read the content
-            if (empty($fileContent)) {
+            // For PDFs, first verify we can actually read the content and it's valid
+            if (empty($fileContent) || !$fileHandler->isValidPDF($filePath)) {
                 header('Content-Type: application/json');
                 http_response_code(403);
-                echo json_encode(['error' => 'Unable to access PDF file. Access may be restricted.']);
+                echo json_encode(['error' => 'Invalid or corrupted PDF file. The file cannot be displayed.']);
                 exit();
             }
 
-            // If PDF content is readable, proceed with display
+            // If PDF content is readable and valid, proceed with display
             header_remove();
             header('Content-Type: application/pdf');
             header('Content-Length: ' . strlen($fileContent));

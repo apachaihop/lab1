@@ -332,70 +332,117 @@ class FileHandler
         return in_array($mimeType, $this->allowedPDFTypes);
     }
 
-    public function isValidPDF($filePath)
+    public function isValidPDF($filePath): bool
     {
         $fullPath = $this->repoFilesPath . $filePath;
-        if (!file_exists($fullPath)) {
-            return false;
-        }
-
-        // Check MIME type
-        $mimeType = mime_content_type($fullPath);
-        if (!in_array($mimeType, $this->allowedPDFTypes)) {
-            return false;
-        }
-
-        // Read first few bytes to check PDF signature
-        $handle = fopen($fullPath, 'rb');
-        if (!$handle) {
-            return false;
-        }
-
-        $header = fread($handle, 4);
-        fclose($handle);
-
-        // Check for PDF signature %PDF
-        return $header === '%PDF';
-    }
-
-    public function isPDFReadable($filePath)
-    {
-        $fullPath = $this->repoFilesPath . $filePath;
-
-        // Basic checks
-        if (!file_exists($fullPath) || !is_readable($fullPath)) {
-            return false;
-        }
-
-        // Check if it's actually a PDF
-        if (!$this->isPDF($filePath)) {
-            return false;
-        }
 
         try {
-            // Try to read the first few bytes
+            // Basic existence and permission checks
+            if (!file_exists($fullPath)) {
+                error_log("PDF validation failed: File does not exist - " . $fullPath);
+                return false;
+            }
+
+            if (!is_readable($fullPath)) {
+                error_log("PDF validation failed: File not readable - " . $fullPath);
+                return false;
+            }
+
+            // Check file size
+            $fileSize = filesize($fullPath);
+            if ($fileSize === false || $fileSize === 0 || $fileSize > $this->maxFileSize) {
+                error_log("PDF validation failed: Invalid file size - " . $fullPath);
+                return false;
+            }
+
+            // Check MIME type
+            $mimeType = mime_content_type($fullPath);
+            if (!in_array($mimeType, $this->allowedPDFTypes)) {
+                error_log("PDF validation failed: Invalid mime type ($mimeType) - " . $fullPath);
+                return false;
+            }
+
+            // Read and validate PDF header
             $handle = @fopen($fullPath, 'rb');
             if (!$handle) {
+                error_log("PDF validation failed: Cannot open file - " . $fullPath);
                 return false;
             }
 
-            $header = @fread($handle, 4);
+            // Read first 1024 bytes for thorough header checking
+            $header = @fread($handle, 1024);
             @fclose($handle);
 
-            // Verify PDF signature and successful read
-            if ($header === false || $header !== '%PDF') {
+            if ($header === false) {
+                error_log("PDF validation failed: Cannot read file header - " . $fullPath);
                 return false;
             }
 
-            // Try to get file size
-            $fileSize = @filesize($fullPath);
-            if ($fileSize === false || $fileSize === 0) {
+            // Check for PDF signature %PDF-1.
+            if (!preg_match('/%PDF-1\.[0-9]/', $header)) {
+                error_log("PDF validation failed: Invalid PDF signature - " . $fullPath);
+                return false;
+            }
+
+            // Check for binary characters after header (common in valid PDFs)
+            if (!preg_match('/[\x00\x0A\x0D\x0C\x09\x20]{1,}/', $header)) {
+                error_log("PDF validation failed: Missing binary characters after signature - " . $fullPath);
+                return false;
+            }
+
+            // Check for EOF marker in the last 1024 bytes
+            $fileHandle = @fopen($fullPath, 'rb');
+            if ($fileHandle) {
+                fseek($fileHandle, -1024, SEEK_END);
+                $ending = @fread($fileHandle, 1024);
+                @fclose($fileHandle);
+
+                if ($ending === false || !preg_match('/%%EOF\s*$/', $ending)) {
+                    error_log("PDF validation failed: Missing EOF marker - " . $fullPath);
+                    return false;
+                }
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log("PDF validation failed with exception: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function isPDFReadable($filePath): bool
+    {
+        try {
+            // First check if it's a valid PDF
+            if (!$this->isValidPDF($filePath)) {
+                return false;
+            }
+
+            $fullPath = $this->repoFilesPath . $filePath;
+
+            // Additional readability checks
+            if (!is_file($fullPath)) {
+                error_log("PDF readability check failed: Not a regular file - " . $fullPath);
+                return false;
+            }
+
+            // Check file permissions
+            $perms = fileperms($fullPath);
+            if ($perms === false || ($perms & 0444) === 0) {
+                error_log("PDF readability check failed: Insufficient permissions - " . $fullPath);
+                return false;
+            }
+
+            // Try to get file contents
+            $contents = @file_get_contents($fullPath, false, null, 0, 1024);
+            if ($contents === false) {
+                error_log("PDF readability check failed: Cannot read file contents - " . $fullPath);
                 return false;
             }
 
             return true;
         } catch (Exception $e) {
-            error_log("PDF read check failed for file: " . $filePath . " - " . $e->getMessage());
+            error_log("PDF readability check failed with exception: " . $e->getMessage());
             return false;
         }
     }
