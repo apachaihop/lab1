@@ -9,6 +9,32 @@ session_start();
 
 use App\CacheManager;
 
+// Add the getSearchHistory function here
+function getSearchHistory()
+{
+    if (!isset($_COOKIE['repo_search_history'])) {
+        return [];
+    }
+
+    try {
+        $hashedHistory = $_COOKIE['repo_search_history'];
+        $decodedHistory = base64_decode($hashedHistory);
+        if ($decodedHistory === false) {
+            return [];
+        }
+
+        $history = json_decode($decodedHistory, true);
+        if (!is_array($history)) {
+            return [];
+        }
+
+        return array_slice($history, -5); // Keep last 5 searches
+    } catch (Exception $e) {
+        error_log("Error decoding search history: " . $e->getMessage());
+        return [];
+    }
+}
+
 try {
     $conn = getConnection();
     $cacheManager = new CacheManager($conn);
@@ -395,6 +421,44 @@ try {
         $types = "idddddii";
 
         if ($searchField && $searchTerm) {
+            $searchHistory = getSearchHistory();
+            $newSearch = [
+                'field' => $searchField,
+                'term' => $searchTerm,
+                'timestamp' => time()
+            ];
+
+            // Check if this search already exists
+            $exists = false;
+            foreach ($searchHistory as $search) {
+                if ($search['field'] === $newSearch['field'] && $search['term'] === $newSearch['term']) {
+                    $exists = true;
+                    break;
+                }
+            }
+
+            if (!$exists) {
+                $searchHistory[] = $newSearch;
+                $searchHistory = array_slice($searchHistory, -5); // Keep last 5 searches
+
+                // Encode the search history
+                $jsonHistory = json_encode($searchHistory);
+                $encodedHistory = base64_encode($jsonHistory);
+
+                // Set the cookie
+                setcookie(
+                    'repo_search_history',
+                    $encodedHistory,
+                    [
+                        'expires' => time() + (86400 * 30),
+                        'path' => '/',
+                        'secure' => true,
+                        'httponly' => false,
+                        'samesite' => 'Strict'
+                    ]
+                );
+            }
+
             $sql .= " WHERE R.$searchField LIKE ?";
             $params[] = "%$searchTerm%";
             $types .= "s";
@@ -432,6 +496,23 @@ try {
         ?>
         <div class="container mt-4">
             <h1>Repositories</h1>
+
+            <?php
+            $searchHistory = getSearchHistory();
+            if (!empty($searchHistory)): ?>
+                <div class="mb-3">
+                    <h6>Recent Searches:</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($searchHistory as $search): ?>
+                            <a href="?field=<?php echo htmlspecialchars($search['field']); ?>&amp;search=<?php echo htmlspecialchars($search['term']); ?>"
+                                class="badge bg-secondary text-decoration-none">
+                                <?php echo htmlspecialchars($search['field']) . ': ' . htmlspecialchars($search['term']); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <form method="get" class="mb-3">
                 <div class="form-row">
                     <div class="col">
@@ -603,5 +684,26 @@ try {
 
     .file-preview-link:hover {
         background-color: #f8f9fa;
+    }
+
+    .gap-2 {
+        gap: 0.5rem;
+    }
+
+    .badge.bg-secondary {
+        padding: 0.5em 1em;
+        background-color: #6c757d;
+        color: white;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+        text-decoration: none;
+        display: inline-block;
+        margin: 0.2rem;
+    }
+
+    .badge.bg-secondary:hover {
+        background-color: #5a6268;
+        color: white;
+        text-decoration: none;
     }
 </style>
