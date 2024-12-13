@@ -496,77 +496,45 @@ try {
         const modalBody = modal.find('.modal-body');
         const pdfViewer = document.getElementById('pdfViewer');
         const fileContent = document.getElementById('fileContent');
-        const errorDiv = modalBody.find('.alert-danger');
 
-        if (errorDiv.length) {
-            errorDiv.remove();
-        }
+        // Clear previous content and errors
+        pdfViewer.style.display = 'none';
+        fileContent.style.display = 'none';
+        modalBody.find('.alert-danger').remove();
 
-        fetch(`check_file_type.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.isPDF) {
-                    // First check if PDF is readable
-                    fetch(`check_pdf_readable.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
-                        .then(response => response.json())
-                        .then(readableData => {
-                            if (!readableData.readable) {
-                                throw new Error(readableData.error || 'PDF file is not accessible');
-                            }
-
-                            pdfViewer.style.display = 'block';
-                            fileContent.style.display = 'none';
-
-                            const embedElement = pdfViewer.querySelector('embed');
-                            embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
-
-                            embedElement.onerror = function() {
-                                throw new Error('Failed to load PDF file. The file might be corrupted or you may not have permission to view it.');
-                            };
-                        })
-                        .catch(error => {
-                            modalBody.prepend(`
-                                <div class="alert alert-danger">
-                                    ${error.message}
-                                </div>
-                            `);
-                            pdfViewer.style.display = 'none';
-                        });
-                } else {
-                    // Handle non-PDF files...
-                    fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
-                        .then(response => {
-                            if (!response.ok) {
-                                return response.json().then(err => {
-                                    throw new Error(err.error || 'Failed to load file');
-                                });
-                            }
-                            return response.text();
-                        })
-                        .then(content => {
-                            fileContent.textContent = content;
-                            fileContent.style.display = 'block';
-                            pdfViewer.style.display = 'none';
-                        })
-                        .catch(error => {
-                            modalBody.prepend(`
-                                <div class="alert alert-danger">
-                                    ${error.message}
-                                </div>
-                            `);
-                            fileContent.style.display = 'none';
-                        });
+        fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.message || err.error || 'Failed to access file');
+                    });
                 }
-                modal.modal('show');
+
+                if (contentType.includes('application/pdf')) {
+                    pdfViewer.style.display = 'block';
+                    const embedElement = pdfViewer.querySelector('embed');
+                    embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
+
+                    embedElement.onerror = () => {
+                        throw new Error('Failed to load PDF file. The file might be corrupted or inaccessible.');
+                    };
+                } else {
+                    return response.text().then(content => {
+                        fileContent.textContent = content;
+                        fileContent.style.display = 'block';
+                    });
+                }
             })
             .catch(error => {
                 modalBody.prepend(`
                     <div class="alert alert-danger">
-                        Error checking file type: ${error.message}
+                        ${error.message}
                     </div>
                 `);
-                modal.modal('show');
             });
+
+        modal.modal('show');
     }
 
     // Update modal close handler

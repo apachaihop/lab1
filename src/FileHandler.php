@@ -348,13 +348,6 @@ class FileHandler
                 return false;
             }
 
-            // Check file size
-            $fileSize = filesize($fullPath);
-            if ($fileSize === false || $fileSize === 0 || $fileSize > $this->maxFileSize) {
-                error_log("PDF validation failed: Invalid file size - " . $fullPath);
-                return false;
-            }
-
             // Read first bytes to check PDF signature
             $handle = @fopen($fullPath, 'rb');
             if (!$handle) {
@@ -362,10 +355,12 @@ class FileHandler
                 return false;
             }
 
-            $signature = fread($handle, 5);
+            // Read first 5 bytes for PDF signature
+            $signature = @fread($handle, 5);
             fclose($handle);
 
-            if ($signature === false || substr($signature, 0, 4) !== '%PDF') {
+            // Check for exact PDF signature match
+            if ($signature === false || !preg_match('/^%PDF-[0-9]/', $signature)) {
                 error_log("PDF validation failed: Invalid PDF signature - " . $fullPath);
                 return false;
             }
@@ -412,5 +407,20 @@ class FileHandler
             error_log("PDF readability check failed with exception: " . $e->getMessage());
             return false;
         }
+    }
+
+    public function isFileReadable($filePath)
+    {
+        $fullPath = $this->repoFilesPath . $filePath;
+
+        if (!file_exists($fullPath)) {
+            throw new Exception("File not found on server");
+        }
+
+        if (!is_readable($fullPath)) {
+            throw new Exception("File exists but is not readable. Please contact administrator.");
+        }
+
+        return true;
     }
 }

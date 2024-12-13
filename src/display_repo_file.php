@@ -31,34 +31,30 @@ try {
 
     if ($fileResult->num_rows === 0) {
         http_response_code(404);
-        echo json_encode(['error' => 'File not found']);
+        echo json_encode(['error' => 'File not found in database']);
         exit();
     }
-
 
     $fileHandler = new FileHandler();
     $filePath = $repoId . '/' . $fileName;
 
     try {
-        $fileContent = $fileHandler->getRepoFile($filePath);
+        // Check if file is readable before attempting to access it
+        $fileHandler->isFileReadable($filePath);
 
         if ($fileHandler->isPDF($filePath)) {
-            // For PDFs, first verify we can actually read the content and it's valid
-            if (!is_readable($fileHandler->repoFilesPath . $filePath)) {
-                header('Content-Type: application/json');
-                http_response_code(403);
-                echo json_encode(['error' => 'Access denied. You do not have permission to view this file.']);
-                exit();
-            }
+            // Get file content first to check if it's readable
+            $fileContent = $fileHandler->getRepoFile($filePath);
 
-            if (empty($fileContent) || !$fileHandler->isValidPDF($filePath)) {
+            // Validate PDF and check content before setting headers
+            if (!$fileHandler->isValidPDF($filePath) || empty($fileContent)) {
                 header('Content-Type: application/json');
                 http_response_code(400);
-                echo json_encode(['error' => 'Invalid or corrupted PDF file. The file cannot be displayed.']);
+                echo json_encode(['error' => 'Cannot open PDF file. The file might be corrupted or inaccessible.']);
                 exit();
             }
 
-            // If PDF content is readable and valid, proceed with display
+            // If we get here, the PDF is valid and readable
             header_remove();
             header('Content-Type: application/pdf');
             header('Content-Length: ' . strlen($fileContent));
@@ -72,27 +68,18 @@ try {
             print($fileContent);
             exit();
         } else {
+            $fileContent = $fileHandler->getRepoFile($filePath);
             header('Content-Type: text/plain; charset=UTF-8');
             echo $fileContent;
         }
     } catch (Exception $e) {
-        // Reset content type to JSON for error responses
         header('Content-Type: application/json');
-
-        if (strpos($e->getMessage(), 'permission') !== false || !is_readable($fileHandler->repoFilesPath . $filePath)) {
-            http_response_code(403);
-            echo json_encode([
-                'error' => 'Access denied. You do not have permission to view this file.',
-                'type' => 'permission_error'
-            ]);
-        } else {
-            http_response_code(500);
-            echo json_encode([
-                'error' => 'Error reading file',
-                'message' => $e->getMessage(),
-                'type' => 'file_access_error'
-            ]);
-        }
+        http_response_code(403);
+        echo json_encode([
+            'error' => 'Error accessing file',
+            'message' => $e->getMessage(),
+            'type' => 'file_access_error'
+        ]);
         exit();
     }
 } catch (Exception $e) {
