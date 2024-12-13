@@ -59,17 +59,42 @@ try {
     try {
         $fileContent = $fileHandler->getRepoFile($filePath);
 
-        // Set appropriate headers based on file type
         if ($fileHandler->isPDF($filePath)) {
+            // For PDFs, first verify we can actually read the content
+            if (empty($fileContent)) {
+                header('Content-Type: application/json');
+                http_response_code(403);
+                echo json_encode(['error' => 'Unable to access PDF file. Access may be restricted.']);
+                exit();
+            }
+
+            // If PDF content is readable, proceed with display
+            header_remove();
             header('Content-Type: application/pdf');
+            header('Content-Length: ' . strlen($fileContent));
+            header('Content-Disposition: inline; filename="' . basename($fileName) . '"');
+
+            // Clear any buffered output
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Output PDF content
+            print($fileContent);
+            exit();
         } else {
             header('Content-Type: text/plain; charset=UTF-8');
+            echo $fileContent;
         }
-
-        echo $fileContent;
     } catch (Exception $e) {
+        // Reset content type to JSON for error responses
+        header('Content-Type: application/json');
         http_response_code(500);
-        echo json_encode(['error' => 'Error reading file: ' . $e->getMessage()]);
+        echo json_encode([
+            'error' => 'Error reading file',
+            'message' => $e->getMessage(),
+            'type' => 'file_access_error'
+        ]);
     }
 } catch (Exception $e) {
     http_response_code(500);

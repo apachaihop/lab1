@@ -357,4 +357,24 @@ class FileHandler
         // Check for PDF signature %PDF
         return $header === '%PDF';
     }
+
+    public function isPDFReadable($filePath)
+    {
+        $fullPath = $this->repoFilesPath . $filePath;
+        if (!file_exists($fullPath) || !is_readable($fullPath)) {
+            return false;
+        }
+
+        // Try to read the first few bytes
+        $handle = @fopen($fullPath, 'rb');
+        if (!$handle) {
+            return false;
+        }
+
+        $header = @fread($handle, 4);
+        @fclose($handle);
+
+        // Check for PDF signature and valid read
+        return $header !== false && $header === '%PDF';
+    }
 }

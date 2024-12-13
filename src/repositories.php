@@ -494,31 +494,51 @@ try {
     function previewFile(repoId, fileName) {
         const modal = $('#filePreviewModal');
         const modalBody = modal.find('.modal-body');
-        const errorDiv = $('<div class="alert alert-danger"></div>');
+        const pdfViewer = document.getElementById('pdfViewer');
+        const fileContent = document.getElementById('fileContent');
+        const errorDiv = modalBody.find('.alert-danger');
+
+        if (errorDiv.length) {
+            errorDiv.remove();
+        }
 
         fetch(`check_file_type.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || 'Failed to check file type');
-                    });
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.isPDF) {
-                    const pdfViewer = document.getElementById('pdfViewer');
-                    const embedElement = pdfViewer.querySelector('embed');
-                    embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
-                    embedElement.onerror = function() {
-                        errorDiv.text('Failed to load PDF file. The file might be corrupted, invalid, or you may not have permission to view it.');
-                        modalBody.prepend(errorDiv);
-                        pdfViewer.style.display = 'none';
-                    };
-                    pdfViewer.style.display = 'block';
-                    document.getElementById('fileContent').style.display = 'none';
-                    errorDiv.remove();
+                    // First check if PDF is readable
+                    fetch(`check_pdf_readable.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+                        .then(response => response.json())
+                        .then(readableData => {
+                            if (!readableData.readable) {
+                                throw new Error('PDF file is not accessible or corrupted');
+                            }
+
+                            pdfViewer.style.display = 'block';
+                            fileContent.style.display = 'none';
+
+                            const embedElement = pdfViewer.querySelector('embed');
+                            embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
+
+                            embedElement.onerror = function() {
+                                modalBody.prepend(`
+                                    <div class="alert alert-danger">
+                                        Failed to load PDF file. The file might be corrupted or you may not have permission to view it.
+                                    </div>
+                                `);
+                                pdfViewer.style.display = 'none';
+                            };
+                        })
+                        .catch(error => {
+                            modalBody.prepend(`
+                                <div class="alert alert-danger">
+                                    ${error.message}
+                                </div>
+                            `);
+                            pdfViewer.style.display = 'none';
+                        });
                 } else {
+                    // Handle non-PDF files...
                     fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
                         .then(response => {
                             if (!response.ok) {
@@ -529,24 +549,27 @@ try {
                             return response.text();
                         })
                         .then(content => {
-                            const preElement = document.getElementById('fileContent');
-                            preElement.textContent = content;
-                            preElement.style.display = 'block';
-                            document.getElementById('pdfViewer').style.display = 'none';
-                            errorDiv.remove();
+                            fileContent.textContent = content;
+                            fileContent.style.display = 'block';
+                            pdfViewer.style.display = 'none';
                         })
                         .catch(error => {
-                            console.error('Error:', error);
-                            errorDiv.text(`Error loading file: ${error.message}`);
-                            modalBody.prepend(errorDiv);
+                            modalBody.prepend(`
+                                <div class="alert alert-danger">
+                                    ${error.message}
+                                </div>
+                            `);
+                            fileContent.style.display = 'none';
                         });
                 }
                 modal.modal('show');
             })
             .catch(error => {
-                console.error('Error:', error);
-                errorDiv.text(`Error: ${error.message}`);
-                modalBody.prepend(errorDiv);
+                modalBody.prepend(`
+                    <div class="alert alert-danger">
+                        Error checking file type: ${error.message}
+                    </div>
+                `);
                 modal.modal('show');
             });
     }
