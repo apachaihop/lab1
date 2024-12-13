@@ -16,10 +16,40 @@ try {
     $repoId = intval($_GET['repo_id']);
     $fileName = htmlspecialchars($_GET['file_name']);
 
-    // Verify user access (similar to display_repo_file.php)
+    // Check if user is logged in
     if (!isset($_SESSION['user_id'])) {
         http_response_code(401);
         echo json_encode(['error' => 'Please log in to access files']);
+        exit();
+    }
+
+    // Check if file exists in database
+    $fileStmt = $conn->prepare("SELECT file_path FROM RepositoryFiles WHERE repo_id = ? AND file_name = ?");
+    $fileStmt->bind_param("is", $repoId, $fileName);
+    $fileStmt->execute();
+    $fileResult = $fileStmt->get_result();
+
+    if ($fileResult->num_rows === 0) {
+        http_response_code(404);
+        echo json_encode(['error' => 'File not found']);
+        exit();
+    }
+
+    // Check if user has access to this repository
+    $stmt = $conn->prepare("
+        SELECT R.repo_id 
+        FROM Repositories R
+        LEFT JOIN RepositorySubscriptions RS ON R.repo_id = RS.repo_id AND RS.user_id = ?
+        WHERE R.repo_id = ? AND (R.user_id = ? OR RS.repo_id IS NOT NULL)
+    ");
+    $stmt->bind_param("iii", $_SESSION['user_id'], $repoId, $_SESSION['user_id']);
+    $stmt->execute();
+    $hasAccess = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+
+    if (!$hasAccess) {
+        http_response_code(403);
+        echo json_encode(['error' => 'You do not have permission to access this file']);
         exit();
     }
 
