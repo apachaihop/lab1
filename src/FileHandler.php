@@ -355,52 +355,19 @@ class FileHandler
                 return false;
             }
 
-            // Check MIME type
-            $mimeType = mime_content_type($fullPath);
-            if (!in_array($mimeType, $this->allowedPDFTypes)) {
-                error_log("PDF validation failed: Invalid mime type ($mimeType) - " . $fullPath);
-                return false;
-            }
-
-            // Read and validate PDF header
+            // Read first bytes to check PDF signature
             $handle = @fopen($fullPath, 'rb');
             if (!$handle) {
                 error_log("PDF validation failed: Cannot open file - " . $fullPath);
                 return false;
             }
 
-            // Read first 1024 bytes for thorough header checking
-            $header = @fread($handle, 1024);
-            @fclose($handle);
+            $signature = fread($handle, 5);
+            fclose($handle);
 
-            if ($header === false) {
-                error_log("PDF validation failed: Cannot read file header - " . $fullPath);
-                return false;
-            }
-
-            // Check for PDF signature %PDF-1.
-            if (!preg_match('/%PDF-1\.[0-9]/', $header)) {
+            if ($signature === false || substr($signature, 0, 4) !== '%PDF') {
                 error_log("PDF validation failed: Invalid PDF signature - " . $fullPath);
                 return false;
-            }
-
-            // Check for binary characters after header (common in valid PDFs)
-            if (!preg_match('/[\x00\x0A\x0D\x0C\x09\x20]{1,}/', $header)) {
-                error_log("PDF validation failed: Missing binary characters after signature - " . $fullPath);
-                return false;
-            }
-
-            // Check for EOF marker in the last 1024 bytes
-            $fileHandle = @fopen($fullPath, 'rb');
-            if ($fileHandle) {
-                fseek($fileHandle, -1024, SEEK_END);
-                $ending = @fread($fileHandle, 1024);
-                @fclose($fileHandle);
-
-                if ($ending === false || !preg_match('/%%EOF\s*$/', $ending)) {
-                    error_log("PDF validation failed: Missing EOF marker - " . $fullPath);
-                    return false;
-                }
             }
 
             return true;
