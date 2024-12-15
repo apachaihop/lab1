@@ -321,15 +321,51 @@ class FileHandler
         return $success;
     }
 
-    public function isPDF($filePath)
+    public function isPDF($filePath): bool
     {
         $fullPath = $this->repoFilesPath . $filePath;
+        error_log("Checking if file is PDF: " . $fullPath);
+
         if (!file_exists($fullPath)) {
+            error_log("File does not exist: " . $fullPath);
             return false;
         }
 
+        // Check file size first
+        $fileSize = filesize($fullPath);
+        if ($fileSize === 0) {
+            error_log("File is empty: " . $fullPath);
+            return false;
+        }
+
+        // Check MIME type
         $mimeType = mime_content_type($fullPath);
-        return in_array($mimeType, $this->allowedPDFTypes);
+        error_log("File MIME type: " . $mimeType);
+
+        if ($mimeType === 'application/x-empty') {
+            error_log("File is empty (x-empty mime type): " . $fullPath);
+            return false;
+        }
+
+        if (!in_array($mimeType, $this->allowedPDFTypes) && $mimeType !== 'application/octet-stream') {
+            error_log("Invalid MIME type for PDF: " . $mimeType);
+            return false;
+        }
+
+        // Verify PDF signature
+        $handle = @fopen($fullPath, 'rb');
+        if (!$handle) {
+            error_log("Could not open file for PDF signature check: " . $fullPath);
+            return false;
+        }
+
+        $signature = @fread($handle, 4);
+        fclose($handle);
+
+        $isPDF = $signature === '%PDF';
+        error_log("PDF signature check result: " . ($isPDF ? 'true' : 'false') . " (signature: " . bin2hex($signature) . ")");
+
+        return $isPDF;
     }
 
     public function isValidPDF($filePath): bool
@@ -355,12 +391,12 @@ class FileHandler
                 return false;
             }
 
-            // Read first 5 bytes for PDF signature
-            $signature = @fread($handle, 5);
+            // Read first 4 bytes for PDF signature
+            $signature = @fread($handle, 4);
             fclose($handle);
 
-            // Check for exact PDF signature match
-            if ($signature === false || !preg_match('/^%PDF-[0-9]/', $signature)) {
+            // Check for PDF signature
+            if ($signature === false || $signature !== '%PDF') {
                 error_log("PDF validation failed: Invalid PDF signature - " . $fullPath);
                 return false;
             }

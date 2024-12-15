@@ -43,32 +43,48 @@ try {
         $fileHandler->isFileReadable($filePath);
 
         if ($fileHandler->isPDF($filePath)) {
-            // Get file content first to check if it's readable
+            error_log("File identified as PDF: " . $filePath);
+
+            // Get file content first to validate
             $fileContent = $fileHandler->getRepoFile($filePath);
 
-            // Validate PDF and check content before setting headers
-            if (!$fileHandler->isValidPDF($filePath) || empty($fileContent)) {
+            // Check for binary content that's not a valid PDF
+            $firstBytes = substr($fileContent, 0, 4);
+            if ($firstBytes !== '%PDF') {
+                error_log("Invalid PDF content detected. First bytes: " . bin2hex($firstBytes));
                 header('Content-Type: application/json');
                 http_response_code(400);
-                echo json_encode(['error' => 'Cannot open PDF file. The file might be corrupted or inaccessible.']);
+                echo json_encode([
+                    'error' => 'Invalid PDF content',
+                    'details' => 'File appears to be corrupted or in wrong format'
+                ]);
                 exit();
             }
 
-            // If we get here, the PDF is valid and readable
-            header_remove();
-            header('Content-Type: application/pdf');
-            header('Content-Length: ' . strlen($fileContent));
-            header('Content-Disposition: inline; filename="' . basename($fileName) . '"');
-
-            // Clear any buffered output
+            // Clear any previous output
             if (ob_get_level()) {
                 ob_end_clean();
             }
 
+            header('Content-Type: application/pdf');
+            header('Content-Length: ' . strlen($fileContent));
+            header('Content-Disposition: inline; filename="' . basename($fileName) . '"');
+
             print($fileContent);
             exit();
         } else {
+            // For non-PDF files, check if it's binary content
             $fileContent = $fileHandler->getRepoFile($filePath);
+            if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\xFF]/', substr($fileContent, 0, 512))) {
+                header('Content-Type: application/json');
+                http_response_code(400);
+                echo json_encode([
+                    'error' => 'Invalid file format',
+                    'details' => 'File appears to be binary and cannot be displayed'
+                ]);
+                exit();
+            }
+
             header('Content-Type: text/plain; charset=UTF-8');
             echo $fileContent;
         }

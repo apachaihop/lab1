@@ -320,6 +320,7 @@ closeConnection($conn);
 include '../includes/footer.php';
 ?>
 
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
 <script>
     $(document).ready(function() {
         // File deletion handler

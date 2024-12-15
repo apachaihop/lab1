@@ -502,29 +502,69 @@ try {
         fileContent.style.display = 'none';
         modalBody.find('.alert-danger').remove();
 
-        fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
-            .then(response => {
-                const contentType = response.headers.get('content-type');
-                if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.message || err.error || 'Failed to access file');
-                    });
+        // First check if it's a valid PDF
+        fetch(`check_file_type.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.isPDF) {
+                    return fetch(`check_pdf_readable.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+                        .then(response => response.json())
+                        .then(readableData => {
+                            if (!readableData.readable) {
+                                throw new Error(readableData.error || 'PDF file is not readable');
+                            }
+                            return true;
+                        });
                 }
+                return false;
+            })
+            .then(isPDF => {
+                return fetch(`display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`)
+                    .then(response => {
+                        const contentType = response.headers.get('content-type');
+                        console.log('Response content type:', contentType);
 
-                if (contentType.includes('application/pdf')) {
-                    pdfViewer.style.display = 'block';
-                    const embedElement = pdfViewer.querySelector('embed');
-                    embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
+                        if (!response.ok) {
+                            return response.json().then(err => {
+                                throw new Error(err.details || err.error || 'Failed to access file');
+                            });
+                        }
 
-                    embedElement.onerror = () => {
-                        throw new Error('Failed to load PDF file. The file might be corrupted or inaccessible.');
-                    };
-                } else {
-                    return response.text().then(content => {
-                        fileContent.textContent = content;
-                        fileContent.style.display = 'block';
+                        if (contentType.includes('application/json')) {
+                            return response.json().then(err => {
+                                throw new Error(err.details || err.error || 'Invalid file format');
+                            });
+                        }
+
+                        if (isPDF && !contentType.includes('application/pdf')) {
+                            throw new Error('File is not a valid PDF');
+                        }
+
+                        if (isPDF) {
+                            pdfViewer.style.display = 'block';
+                            const embedElement = pdfViewer.querySelector('embed');
+                            embedElement.src = `display_repo_file.php?repo_id=${repoId}&file_name=${encodeURIComponent(fileName)}`;
+
+                            embedElement.onerror = () => {
+                                throw new Error('Failed to load PDF file. The file might be corrupted or inaccessible.');
+                            };
+                        } else {
+                            return response.text().then(content => {
+                                if (content.includes('\0') || /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\xFF]/.test(content.substring(0, 512))) {
+                                    throw new Error('File contains binary content and cannot be displayed');
+                                }
+                                fileContent.textContent = content;
+                                fileContent.style.display = 'block';
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        modalBody.prepend(`
+                            <div class="alert alert-danger">
+                                ${error.message}
+                            </div>
+                        `);
                     });
-                }
             })
             .catch(error => {
                 modalBody.prepend(`
