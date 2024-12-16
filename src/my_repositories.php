@@ -172,7 +172,7 @@ try {
         <h3>Add New Repository</h3>
     </div>
     <div class="card-body">
-        <form method="post" action="my_repositories.php" enctype="multipart/form-data">
+        <form method="post" action="my_repositories.php" enctype="multipart/form-data" onsubmit="return validateFileUpload(document.getElementById('files'))">
             <input type="hidden" name="add_repository" value="1">
             <div class="form-group">
                 <label for="name">Repository Name:</label>
@@ -229,7 +229,7 @@ try {
                                     role="dialog">
                                     <div class="modal-dialog modal-lg" role="document">
                                         <div class="modal-content">
-                                            <form method="post" action="my_repositories.php" enctype="multipart/form-data">
+                                            <form method="post" action="my_repositories.php" enctype="multipart/form-data" onsubmit="return validateFileUpload(document.getElementById('new_files_<?= $repo['repo_id'] ?>'))">
                                                 <div class="modal-header">
                                                     <h5 class="modal-title">Update Repository</h5>
                                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -237,7 +237,6 @@ try {
                                                     </button>
                                                 </div>
                                                 <div class="modal-body">
-                                                    <!-- Existing repository fields -->
                                                     <input type="hidden" name="update_repository_id" value="<?= $repo['repo_id'] ?>">
                                                     <div class="form-group">
                                                         <label>Name:</label>
@@ -284,7 +283,7 @@ try {
                                                     <!-- Add New Files -->
                                                     <div class="form-group">
                                                         <label>Add New Files:</label>
-                                                        <input type="file" class="form-control-file" name="new_files[]" multiple>
+                                                        <input type="file" class="form-control-file" id="new_files_<?= $repo['repo_id'] ?>" name="new_files[]" multiple>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
@@ -354,5 +353,21 @@ include '../includes/footer.php';
             });
         });
     });
+</script>
+
+<script>
+    function validateFileUpload(input) {
+        if (input.files.length > 0) {
+            for (let i = 0; i < input.files.length; i++) {
+                const file = input.files[i];
+                if (!file || file.size === 0) {
+                    alert('One or more selected files are no longer available. Please select your files again.');
+                    input.value = ''; // Clear the input
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 </script>
 ?>

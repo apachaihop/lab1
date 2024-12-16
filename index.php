@@ -61,10 +61,10 @@ try {
                 <div class="row">
                     <div class="col-md-3 text-center">
                         <img src="src/display_avatar.php?user_id=<?= $_SESSION['user_id'] ?>"
-                            onerror="if (this.src != 'assets/images/default-avatar.png') this.src='assets/images/default-avatar.png';"
                             alt="Your avatar"
                             class="rounded-circle mb-3"
-                            style="width: 150px; height: 150px; object-fit: cover;">
+                            style="width: 150px; height: 150px; object-fit: cover;"
+                            onerror="this.onerror=null; this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';">
 
                         <form method="post" enctype="multipart/form-data" action="src/update_avatar.php">
                             <div class="form-group">

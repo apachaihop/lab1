@@ -11,23 +11,80 @@ if (isset($_GET['user_id'])) {
         // Function to serve default avatar with proper error handling
         function serveDefaultAvatar($defaultPath)
         {
-            if (!file_exists($defaultPath)) {
-                error_log("Default avatar not found at: " . $defaultPath);
-                header("HTTP/1.1 500 Internal Server Error");
-                die("Avatar system error");
-            }
+            // Log the error attempt
+            error_log("Attempting to serve default avatar from: " . $defaultPath);
 
-            if (!is_readable($defaultPath)) {
-                error_log("Default avatar not readable at: " . $defaultPath);
-                header("HTTP/1.1 500 Internal Server Error");
-                die("Avatar system error");
+            if (!file_exists($defaultPath) || !is_readable($defaultPath)) {
+                // Log the specific error
+                $errorMsg = !file_exists($defaultPath) ?
+                    "Default avatar file missing" :
+                    "Default avatar file not readable";
+
+                error_log("Avatar System Error: " . $errorMsg . " at path: " . $defaultPath);
+
+                // Send error to monitoring system if you have one
+                // notifyAdmins($errorMsg); // You would need to implement this
+
+                // Generate a simple colored initial avatar as fallback
+                header("Content-Type: image/png");
+
+                // Create an image with error indication
+                $img = imagecreatetruecolor(150, 150);
+                $bgColor = imagecolorallocate($img, 220, 53, 69); // Bootstrap danger red
+                $textColor = imagecolorallocate($img, 255, 255, 255);
+
+                // Fill background
+                imagefill($img, 0, 0, $bgColor);
+
+                // Add error text
+                $text = "!";
+                $font = 5; // Built-in font
+
+                // Center the text
+                $textWidth = imagefontwidth($font) * strlen($text);
+                $textHeight = imagefontheight($font);
+                $x = (150 - $textWidth) / 2;
+                $y = (150 - $textHeight) / 2;
+
+                imagestring($img, $font, $x, $y, $text, $textColor);
+
+                // Output the generated image
+                imagepng($img);
+                imagedestroy($img);
+
+                // Also notify the client side of the error
+                header("X-Avatar-Error: " . $errorMsg);
+                exit;
             }
 
             $defaultData = @file_get_contents($defaultPath);
             if ($defaultData === false) {
-                error_log("Failed to read default avatar at: " . $defaultPath);
-                header("HTTP/1.1 500 Internal Server Error");
-                die("Avatar system error");
+                $errorMsg = "Failed to read default avatar data";
+                error_log("Avatar System Error: " . $errorMsg . " at path: " . $defaultPath);
+
+                // Similar error image generation as above
+                header("Content-Type: image/png");
+                $img = imagecreatetruecolor(150, 150);
+                $bgColor = imagecolorallocate($img, 220, 53, 69);
+                $textColor = imagecolorallocate($img, 255, 255, 255);
+
+                imagefill($img, 0, 0, $bgColor);
+
+                $text = "!";
+                $font = 5;
+
+                $textWidth = imagefontwidth($font) * strlen($text);
+                $textHeight = imagefontheight($font);
+                $x = (150 - $textWidth) / 2;
+                $y = (150 - $textHeight) / 2;
+
+                imagestring($img, $font, $text, $x, $y, $textColor);
+
+                imagepng($img);
+                imagedestroy($img);
+
+                header("X-Avatar-Error: " . $errorMsg);
+                exit;
             }
 
             header("Content-Type: image/png");

@@ -168,3 +168,20 @@ main {
 #fileContent::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+.avatar-container {
+    position: relative;
+}
+
+#avatar-error-message {
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.avatar-error {
+    border: 2px solid #dc3545;
+}
+
+.tooltip {
+    z-index: 1070;
+}
