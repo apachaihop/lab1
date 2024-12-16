@@ -2,7 +2,12 @@
     "name": "anko/lab1",
     "autoload": {
         "psr-4": {
-            "Anko\\Lab1\\": "src/"
+             "App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
         }
     },
     "authors": [
