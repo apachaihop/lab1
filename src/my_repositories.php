@@ -357,7 +357,7 @@ include '../includes/footer.php';
                     }
                 },
                 error: function() {
-                    alert('Error communicating with server');
+                    alert('Error deleting file: file blocked');
                 }
             });
         });
