@@ -135,14 +135,24 @@ class FileHandler
         }
     }
 
-    public function saveRepoFile($conn, $repoId, $file)
+    public function saveRepoFile($conn, $repoId, $fileData)
     {
+        // Check if file already exists
+        $stmt = $conn->prepare("SELECT file_id FROM RepositoryFiles WHERE repo_id = ? AND file_name = ?");
+        $stmt->bind_param("is", $repoId, $fileData['name']);
+        $stmt->execute();
+
+        if ($stmt->get_result()->num_rows > 0) {
+            throw new Exception("A file with this name already exists in the repository");
+        }
+        $stmt->close();
+
         try {
             error_log("Starting saveRepoFile for repoId: " . $repoId);
-            error_log("File data: " . print_r($file, true));
+            error_log("File data: " . print_r($fileData, true));
 
             // Validate file size
-            $this->validateFileSize($file['size']);
+            $this->validateFileSize($fileData['size']);
 
             // Validate file type
             $allowedTypes = array_merge(
@@ -150,15 +160,15 @@ class FileHandler
                 $this->allowedImageTypes,
                 $this->allowedPDFTypes
             );
-            $this->validateFileType($file['type'], $allowedTypes);
+            $this->validateFileType($fileData['type'], $allowedTypes);
 
             $maxFileSize = 1 * 1024 * 1024;
-            if ($file['size'] > $maxFileSize) {
-                error_log("File size exceeds limit: " . $file['size'] . " bytes");
+            if ($fileData['size'] > $maxFileSize) {
+                error_log("File size exceeds limit: " . $fileData['size'] . " bytes");
                 throw new Exception("File size exceeds maximum limit of 1MB");
             }
 
-            if ($file['error'] !== UPLOAD_ERR_OK) {
+            if ($fileData['error'] !== UPLOAD_ERR_OK) {
                 $errorMessages = [
                     UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
                     UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE',
@@ -168,16 +178,16 @@ class FileHandler
                     UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
                     UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
                 ];
-                $errorMessage = isset($errorMessages[$file['error']])
-                    ? $errorMessages[$file['error']]
+                $errorMessage = isset($errorMessages[$fileData['error']])
+                    ? $errorMessages[$fileData['error']]
                     : 'Unknown upload error';
                 error_log("File upload error: " . $errorMessage);
                 throw new Exception("Error uploading file: " . $errorMessage);
             }
 
             // Additional PDF validation for PDF files
-            if ($file['type'] === 'application/pdf') {
-                $tmpName = $file['tmp_name'];
+            if ($fileData['type'] === 'application/pdf') {
+                $tmpName = $fileData['tmp_name'];
 
                 // Check PDF signature
                 $handle = fopen($tmpName, 'rb');
@@ -193,7 +203,7 @@ class FileHandler
                 }
             }
 
-            $fileName = basename($file['name']);
+            $fileName = basename($fileData['name']);
             $fileDir = $this->repoFilesPath . $repoId . '/';
             error_log("Creating directory: " . $fileDir);
 
@@ -207,15 +217,15 @@ class FileHandler
             $filePath = $fileDir . $fileName;
             error_log("Attempting to move file to: " . $filePath);
 
-            if (!is_uploaded_file($file['tmp_name'])) {
-                error_log("Invalid upload attempt - file is not an uploaded file: " . $file['tmp_name']);
+            if (!is_uploaded_file($fileData['tmp_name'])) {
+                error_log("Invalid upload attempt - file is not an uploaded file: " . $fileData['tmp_name']);
                 throw new Exception("Invalid file upload attempt");
             }
 
-            if (!move_uploaded_file($file['tmp_name'], $filePath)) {
+            if (!move_uploaded_file($fileData['tmp_name'], $filePath)) {
                 $moveError = error_get_last();
                 error_log("Failed to move uploaded file. PHP Error: " . print_r($moveError, true));
-                error_log("Source: " . $file['tmp_name']);
+                error_log("Source: " . $fileData['tmp_name']);
                 error_log("Destination: " . $filePath);
                 error_log("File permissions: " . substr(sprintf('%o', fileperms($fileDir)), -4));
                 throw new Exception("Failed to save file to repository");

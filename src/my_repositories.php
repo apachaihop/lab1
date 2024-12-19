@@ -110,37 +110,46 @@ try {
 
             if ($stmt->num_rows > 0) {
                 $stmt->close();
+                $hasErrors = false;  // Flag to track if any errors occurred
+
+                // Update repository
                 $updateStmt = $conn->prepare("UPDATE Repositories SET name = ?, description = ?, language = ? WHERE repo_id = ?");
                 $updateStmt->bind_param("sssi", $name, $description, $language, $repo_id);
-                if ($updateStmt->execute()) {
-                    $success = "Repository updated successfully.";
-                } else {
+                if (!$updateStmt->execute()) {
                     $error = "Error updating repository: " . $updateStmt->error;
+                    $hasErrors = true;
                 }
                 $updateStmt->close();
+
+                // Handle file uploads if there were no errors with repository update
+                if (!$hasErrors && isset($_FILES['new_files'])) {
+                    $fileHandler = new FileHandler();
+                    foreach ($_FILES['new_files']['tmp_name'] as $key => $tmp_name) {
+                        if ($_FILES['new_files']['error'][$key] === UPLOAD_ERR_OK) {
+                            $fileData = [
+                                'name' => $_FILES['new_files']['name'][$key],
+                                'type' => $_FILES['new_files']['type'][$key],
+                                'tmp_name' => $tmp_name,
+                                'error' => $_FILES['new_files']['error'][$key],
+                                'size' => $_FILES['new_files']['size'][$key]
+                            ];
+                            try {
+                                $fileHandler->saveRepoFile($conn, $repo_id, $fileData);
+                            } catch (Exception $e) {
+                                $error .= "Error uploading " . htmlspecialchars($fileData['name']) . ": " . $e->getMessage() . "<br>";
+                                $hasErrors = true;
+                            }
+                        }
+                    }
+                }
+
+                // Only show success message if there were no errors
+                if (!$hasErrors) {
+                    $success = "Repository updated successfully.";
+                }
             } else {
                 $error = "Unauthorized action.";
                 $stmt->close();
-            }
-        }
-
-        if (isset($_FILES['new_files'])) {
-            $fileHandler = new FileHandler();
-            foreach ($_FILES['new_files']['tmp_name'] as $key => $tmp_name) {
-                if ($_FILES['new_files']['error'][$key] === UPLOAD_ERR_OK) {
-                    $fileData = [
-                        'name' => $_FILES['new_files']['name'][$key],
-                        'type' => $_FILES['new_files']['type'][$key],
-                        'tmp_name' => $tmp_name,
-                        'error' => $_FILES['new_files']['error'][$key],
-                        'size' => $_FILES['new_files']['size'][$key]
-                    ];
-                    try {
-                        $fileHandler->saveRepoFile($conn, $repo_id, $fileData);
-                    } catch (Exception $e) {
-                        $error .= "Error uploading " . htmlspecialchars($fileData['name']) . ": " . $e->getMessage() . "<br>";
-                    }
-                }
             }
         }
     }
